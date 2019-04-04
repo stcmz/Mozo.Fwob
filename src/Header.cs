@@ -1,6 +1,7 @@
 ﻿namespace Fwob
 {
     /// <summary>
+    /// FWOB ver1 header definition
     /// A Fixed-Width Ordered Binary (FWOB) file consisits of 3 sections:
     ///   1 Header: pos 0: 210 bytes
     ///   2 String Table: pos 210: length StringTablePreservedLength
@@ -8,8 +9,12 @@
     /// </summary>
     public class Header
     {
+        public const int CurrentVersion = 1;
         public const int HeaderLength = 210;
         public const int MaxFields = 16;
+        public const int MaxFieldNameLength = 8;
+        public const int MaxFrameNameLength = 16;
+        public const int MaxFrameTypeLength = 16;
 
         //*********************** Signature and Version (5 bytes) ************************//
 
