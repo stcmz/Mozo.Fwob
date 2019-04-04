@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -81,6 +82,18 @@ namespace Fwob
             Debug.Assert(!string.IsNullOrWhiteSpace(header.FrameType));
             Debug.Assert(header.FrameType.Length <= Header.MaxFrameTypeLength);
             bw.Write(header.FrameType.PadRight(Header.MaxFrameTypeLength).ToCharArray());
+        }
+
+        public static long WriteStringTable(this BinaryWriter bw, List<string> stringTable)
+        {
+            var p = bw.BaseStream.Position;
+
+            foreach (string s in stringTable)
+            {
+                bw.Write(s);
+            }
+
+            return bw.BaseStream.Position - p;
         }
     }
 }

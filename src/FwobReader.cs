@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace Fwob
@@ -96,6 +98,29 @@ namespace Fwob
                 return null;
 
             return header;
+        }
+
+        public static List<string> ReadStringTable(this BinaryReader br, int stringCount,
+            int stringTableLength, int stringTablePreservedLength)
+        {
+            Debug.Assert(stringTablePreservedLength >= stringTableLength);
+
+            var p = br.BaseStream.Position;
+            if (p + stringTablePreservedLength < br.BaseStream.Length)
+                return null;
+
+            var list = new List<string>();
+            for (int i = 0; i < stringCount; i++)
+            {
+                list.Add(br.ReadString());
+            }
+
+            if (br.BaseStream.Position - p != stringTableLength)
+                return null;
+
+            br.BaseStream.Seek(stringTablePreservedLength - stringTableLength, SeekOrigin.Current);
+
+            return list;
         }
     }
 }
