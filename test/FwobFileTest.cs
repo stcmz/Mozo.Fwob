@@ -823,5 +823,35 @@ namespace FwobUnitTest
 
             File.Delete(temp);
         }
+
+        [TestMethod]
+        public void TestStringTableLimit()
+        {
+            var temp = Path.GetTempFileName();
+            using (var file = FwobFile<Tick, int>.CreateNewFile(temp, "HelloFwob", FileMode.Create))
+            {
+                Assert.ThrowsException<ArgumentNullException>(() => file.AppendString(null));
+
+                for (int i = 0; i < 262; i++) // (2048 - 214) / 7 = 262
+                    Assert.IsTrue(file.AppendString($"abc{i:d3}") == i);
+                Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString("x"));
+
+                for (int i = 0; i < 262; i++)
+                {
+                    Assert.AreEqual(file.GetIndex($"abc{i:d3}"), i);
+                    Assert.AreEqual(file.GetString(i), $"abc{i:d3}");
+                }
+            }
+
+            using (var file = new FwobFile<Tick, int>(temp))
+            {
+                for (int i = 0; i < 262; i++)
+                {
+                    Assert.AreEqual(file.GetIndex($"abc{i:d3}"), i);
+                    Assert.AreEqual(file.GetString(i), $"abc{i:d3}");
+                }
+                Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString(""));
+            }
+        }
     }
 }
