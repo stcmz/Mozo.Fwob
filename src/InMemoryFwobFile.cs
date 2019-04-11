@@ -122,7 +122,7 @@ namespace Fwob
 
         public override int GetIndex(string str)
         {
-            return _dict[str];
+            return _dict.TryGetValue(str, out int index) ? index : -1;
         }
 
         public override int AppendString(string str)

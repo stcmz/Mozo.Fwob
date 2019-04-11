@@ -357,7 +357,7 @@ namespace Fwob
         public override string GetString(int index)
         {
             if (index < 0 || index >= Header.StringCount)
-                throw new IndexOutOfRangeException();
+                throw new ArgumentOutOfRangeException();
 
             if (IsStringsLoaded)
                 return _strings[index];
@@ -407,7 +407,9 @@ namespace Fwob
                 bw.BaseStream.Seek(Header.StringTableEnding, SeekOrigin.Begin);
                 bw.Write(str);
 
-                Header.StringCount++;
+                index = Header.StringCount++;
+                Header.StringTableLength = (int)(bw.BaseStream.Position - Header.StringTablePosition);
+                WriteStringTableLength(bw);
             }
 
             if (IsStringsLoaded)
@@ -415,7 +417,8 @@ namespace Fwob
                 _stringDict[str] = _strings.Count;
                 _strings.Add(str);
             }
-            return _strings.Count - 1;
+
+            return index;
         }
 
         public override bool ContainsString(string str)
@@ -433,18 +436,22 @@ namespace Fwob
             return false;
         }
 
+        void WriteStringTableLength(BinaryWriter bw)
+        {
+            bw.BaseStream.Seek(158, SeekOrigin.Begin);
+            bw.Write(Header.StringCount); // pos 158: StringCount
+            bw.Write(Header.StringTableLength); // pos 162: StringTableLength
+        }
+
         public override void ClearStrings()
         {
             Debug.Assert(IsFileOpen);
 
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
-                bw.BaseStream.Seek(158, SeekOrigin.Begin);
-                bw.Write(0); // StringCount
                 Header.StringCount = 0;
-
-                bw.Write(0); // StringTableLength
                 Header.StringTableLength = 0;
+                WriteStringTableLength(bw);
             }
 
             if (IsStringsLoaded)
