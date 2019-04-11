@@ -153,7 +153,7 @@ namespace Fwob
                 br.BaseStream.Seek(pos + mid * Header.FrameLength, SeekOrigin.Begin);
 
                 int cmp = frame.DeserializeKey(br).CompareTo(key);
-                if (lower && cmp < 0 || cmp <= 0)
+                if (lower ? cmp < 0 : cmp <= 0)
                     lo = mid + 1;
                 else
                     hi = mid;
@@ -252,8 +252,11 @@ namespace Fwob
                 long count = 0;
                 do
                 {
-                    if (it.Current.Key.CompareTo(last.Key) < 0)
-                        throw new InvalidOperationException("Frame keys must be greater than or equal to key of the existing tail frame.");
+                    if (last != null && it.Current.Key.CompareTo(last.Key) < 0)
+                    {
+                        Header.FrameCount += count;
+                        throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                    }
 
                     it.Current.SerializeFrame(bw);
                     last = it.Current;
@@ -263,6 +266,35 @@ namespace Fwob
 
                 Header.FrameCount += count;
                 return count;
+            }
+        }
+
+        public override long AppendFramesTx(IEnumerable<TFrame> frames)
+        {
+            if (frames == null)
+                throw new ArgumentNullException(nameof(frames));
+
+            Debug.Assert(IsFileOpen);
+
+            var last = LastFrame;
+            var list = new List<TFrame>();
+            foreach (var frame in frames)
+            {
+                if (last != null && frame.Key.CompareTo(last.Key) < 0)
+                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                last = frame;
+                list.Add(frame);
+            }
+
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            {
+                Debug.Assert(bw.BaseStream.Length == Header.FileLength);
+
+                foreach (var frame in list)
+                    frame.SerializeFrame(bw);
+
+                Header.FrameCount += list.Count;
+                return list.Count;
             }
         }
 

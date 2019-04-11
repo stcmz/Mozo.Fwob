@@ -60,11 +60,32 @@ namespace Fwob.Models
         IEnumerable<TFrame> GetFramesBefore(TKey lastKey);
 
         /// <summary>
-        /// Append frames to the end of the file while enforcing the ascending order by key.
+        /// Append frames to the end of the file, only the ascending prefix frames will be appended.
+        /// </summary>
+        /// <param name="frames">The frames to be appended</param>
+        /// <returns>The number of frames appended</returns>
+        long AppendFrames(params TFrame[] frames);
+
+        /// <summary>
+        /// Append frames to the end of the file, only the ascending prefix frames will be appended.
         /// </summary>
         /// <param name="frames">Frames to be appended</param>
-        /// <returns></returns>
+        /// <returns>The number of frames appended</returns>
         long AppendFrames(IEnumerable<TFrame> frames);
+
+        /// <summary>
+        /// Append frames to the end of the file while enforcing the ascending order by key. No data will be appended if the ordering rule is violated.
+        /// </summary>
+        /// <param name="frames">The frames to be appended</param>
+        /// <returns>The number of frames appended</returns>
+        long AppendFramesTx(params TFrame[] frames);
+
+        /// <summary>
+        /// Append frames to the end of the file while enforcing the ascending order by key. No data will be appended if the ordering rule is violated.
+        /// </summary>
+        /// <param name="frames">Frames to be appended</param>
+        /// <returns>The number of frames appended</returns>
+        long AppendFramesTx(IEnumerable<TFrame> frames);
 
         /// <summary>
         /// Deletes all <see cref="TFrame"/> instances from the storage.

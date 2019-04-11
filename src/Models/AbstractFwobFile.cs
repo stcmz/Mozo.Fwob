@@ -33,7 +33,19 @@ namespace Fwob.Models
 
         public abstract IEnumerable<TFrame> GetFramesBefore(TKey lastKey);
 
+        public long AppendFrames(params TFrame[] frames)
+        {
+            return AppendFrames((IEnumerable<TFrame>)frames);
+        }
+
         public abstract long AppendFrames(IEnumerable<TFrame> frames);
+
+        public long AppendFramesTx(params TFrame[] frames)
+        {
+            return AppendFramesTx((IEnumerable<TFrame>)frames);
+        }
+
+        public abstract long AppendFramesTx(IEnumerable<TFrame> frames);
 
         public abstract void ClearFrames();
 

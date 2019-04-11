@@ -81,22 +81,40 @@ namespace Fwob
 
         public override long AppendFrames(IEnumerable<TFrame> frames)
         {
-            var first = frames.FirstOrDefault();
-            if (first == null)
-                return 0;
+            if (frames == null)
+                throw new ArgumentNullException(nameof(frames));
 
-            if (_frames.Count == 0)
+            var last = _frames.LastOrDefault();
+            long count = 0;
+            foreach (var frame in frames)
             {
-                _frames.AddRange(frames);
-                return _frames.Count;
+                if (last != null && frame.Key.CompareTo(last.Key) < 0)
+                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                _frames.Add(frame);
+                last = frame;
+                count++;
             }
 
-            if (first.Key.CompareTo(_frames.Last().Key) > 0)
-                throw new InvalidDataException($"Frames should be in ascending order while appending.");
+            return count;
+        }
 
-            var length = _frames.Count;
+        public override long AppendFramesTx(IEnumerable<TFrame> frames)
+        {
+            if (frames == null)
+                throw new ArgumentNullException(nameof(frames));
+
+            var last = _frames.LastOrDefault();
+            long count = 0;
+            foreach (var frame in frames)
+            {
+                if (last != null && frame.Key.CompareTo(last.Key) < 0)
+                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                last = frame;
+                count++;
+            }
+
             _frames.AddRange(frames);
-            return _frames.Count - length;
+            return count;
         }
 
         public override void ClearFrames()
