@@ -81,7 +81,7 @@ namespace Fwob.Header
             // pos 178: 4 bytes, should be the sum of FieldLengths
             header.FrameLength = br.ReadInt32();
 
-            if (header.FrameLength != header.FieldLengths.Take(header.FieldCount).Cast<int>().Sum())
+            if (header.FrameLength != header.FieldLengths.Take(header.FieldCount).Select(o => (int)o).Sum())
                 return null;
 
             // pos 182: 16 bytes (up to 16 chars)

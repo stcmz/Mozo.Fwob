@@ -5,7 +5,7 @@ using System.Text;
 namespace Fwob.Models
 {
     public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, TKey>, IStringTable
-        where TFrame : IFrame<TKey>
+        where TFrame : class, IFrame<TKey>
         where TKey : struct, IComparable<TKey>
 
     {

@@ -10,13 +10,5 @@ namespace Fwob.Models
         where TKey : struct, IComparable<TKey>
     {
         TKey Key { get; }
-
-        void SerializeKey(BinaryWriter bw);
-
-        TKey DeserializeKey(BinaryReader br);
-
-        void SerializeFrame(BinaryWriter bw);
-
-        void DeserializeFrame(BinaryReader br);
     }
 }

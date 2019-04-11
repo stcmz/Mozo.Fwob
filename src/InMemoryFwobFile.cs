@@ -8,7 +8,7 @@ using System.Linq;
 namespace Fwob
 {
     public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
-        where TFrame : IFrame<TKey>
+        where TFrame : class, IFrame<TKey>
         where TKey : struct, IComparable<TKey>
     {
         public override string Title
@@ -40,6 +40,8 @@ namespace Fwob
 
         public override TFrame GetFrame(long index)
         {
+            if (index < 0 || index >= FrameCount)
+                return null;
             return _frames[(int)index];
         }
 

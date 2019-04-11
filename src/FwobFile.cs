@@ -17,7 +17,7 @@ namespace Fwob
     ///   3 Data Frames: pos 214 + StringTablePreservedLength, length FrameCount * FrameLength
     /// </summary>
     public class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, IDisposable
-        where TFrame : class, IFrame<TKey>, new()
+        where TFrame : class, ISerializableFrame<TKey>, new()
         where TKey : struct, IComparable<TKey>
     {
         public override string Title
@@ -43,7 +43,7 @@ namespace Fwob
 
         bool IsFileOpen => Stream != null && FilePath != null && Header != null;
 
-        public static FwobFile<TFrame, TKey> CreateNewFile(string path, string title, FileMode mode, FileAccess access, FileShare share)
+        public static FwobFile<TFrame, TKey> CreateNewFile(string path, string title, FileMode mode = FileMode.CreateNew, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.Read)
         {
             if (title == null)
                 throw new ArgumentNullException(nameof(title));
@@ -59,7 +59,7 @@ namespace Fwob
                 Header = FwobHeader.CreateNew<TFrame>(title),
             };
 
-            using (var bw = new BinaryWriter(file.Stream))
+            using (var bw = new BinaryWriter(file.Stream, Encoding.UTF8, true))
             {
                 bw.WriteHeader(file.Header);
                 bw.Write(new byte[file.Header.StringTablePreservedLength]);
@@ -68,22 +68,23 @@ namespace Fwob
             return file;
         }
 
-        public void Open(string path, FileAccess fileAccess = FileAccess.ReadWrite, FileShare fileShare = FileShare.None)
-        {
-            if (FilePath != null || Stream != null)
-                throw new InvalidOperationException($"File already opened for this associated object.");
+        private FwobFile() { }
 
+        public FwobFile(string path, FileAccess fileAccess = FileAccess.ReadWrite, FileShare fileShare = FileShare.Read)
+        {
             FilePath = path;
             Stream = new FileStream(path, FileMode.Open, fileAccess, fileShare);
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 Header = br.ReadHeader();
 
                 if (Header == null)
                     throw new InvalidDataException($"Input file {path} is not in a FWOB format.");
 
-                if (!Header.Validate<TFrame>())
+                FrameInfo = Header.GetFrameInfo<TFrame>();
+
+                if (FrameInfo == null)
                     throw new InvalidDataException($"Input file {path} does not match frame type {typeof(TFrame)}.");
 
                 if (Header.FileLength != br.BaseStream.Length)
@@ -91,16 +92,6 @@ namespace Fwob
 
                 title = Header.Title;
             }
-        }
-
-        public void OpenForRead(string path)
-        {
-            Open(path, FileAccess.Read, FileShare.Read);
-        }
-
-        public void OpenForWrite(string path)
-        {
-            Open(path, FileAccess.Write, FileShare.Read);
         }
 
         public void Close()
@@ -137,7 +128,7 @@ namespace Fwob
             if (index < 0 || index >= Header.FrameCount)
                 return null;
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(br.BaseStream.Length == Header.FileLength);
                 br.BaseStream.Seek(Header.FirstFramePosition + index * Header.FrameLength, SeekOrigin.Begin);
@@ -179,7 +170,7 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, firstKey, true);
 
@@ -205,7 +196,7 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, firstKey, true);
 
@@ -227,7 +218,7 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, lastKey, false);
 
@@ -253,7 +244,7 @@ namespace Fwob
             if (!it.MoveNext())
                 return 0;
 
-            using (var bw = new BinaryWriter(Stream))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
 
@@ -282,7 +273,7 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 return;
 
-            using (var bw = new BinaryWriter(Stream))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length >= Header.FirstFramePosition);
                 bw.BaseStream.SetLength(Header.FirstFramePosition);
@@ -306,7 +297,7 @@ namespace Fwob
 
             Debug.Assert(IsFileOpen);
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
                 br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
@@ -353,7 +344,7 @@ namespace Fwob
         {
             Debug.Assert(IsFileOpen);
 
-            using (var br = new BinaryReader(Stream))
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
                 br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
@@ -410,7 +401,7 @@ namespace Fwob
             if (Header.StringTableLength + Encoding.UTF8.GetByteCount(str) + Marshal.SizeOf(str.Length) > Header.StringTablePreservedLength)
                 throw new InternalBufferOverflowException("No more preserved space for appending string");
 
-            using (var bw = new BinaryWriter(Stream))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length >= Header.FirstFramePosition);
                 bw.BaseStream.Seek(Header.StringTableEnding, SeekOrigin.Begin);
@@ -446,7 +437,7 @@ namespace Fwob
         {
             Debug.Assert(IsFileOpen);
 
-            using (var bw = new BinaryWriter(Stream))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 bw.BaseStream.Seek(158, SeekOrigin.Begin);
                 bw.Write(0); // StringCount

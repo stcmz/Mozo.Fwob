@@ -76,7 +76,7 @@ namespace Fwob.Header
 
             if (string.IsNullOrEmpty(title))
                 throw new ArgumentNullException(nameof(title), "Argument {0} should not be null or empty");
-            if (title.Length <= FwobLimits.MaxTitleLength)
+            if (title.Length > FwobLimits.MaxTitleLength)
                 throw new ArgumentOutOfRangeException(nameof(title), title, $"Length of argument {{0}} exceeded MaxTitleLength {FwobLimits.MaxTitleLength}");
 
             var frameInfo = FrameInfo.FromSystem(frameType);
@@ -104,36 +104,30 @@ namespace Fwob.Header
             return header;
         }
 
-        public bool Validate<TFrame>()
+        public FrameInfo GetFrameInfo<TFrame>()
         {
-            var frameType = typeof(TFrame);
-            var fields = frameType.GetFields();
+            var frameInfo = FrameInfo.FromSystem<TFrame>();
 
-            Debug.Assert(fields.Length > 0 && fields.Length <= FwobLimits.MaxFields);
-            Debug.Assert(fields.All(o => o != null));
-            Debug.Assert(fields.All(o => o.Name.Length <= FwobLimits.MaxFieldNameLength));
+            if (FrameType != frameInfo.FrameType)
+                return null;
+            if (FrameLength != frameInfo.FrameLength)
+                return null;
 
-            ulong fieldTypes = 0;
+            if (FieldCount != frameInfo.Fields.Count)
+                return null;
+            if (FieldTypes != frameInfo.FieldTypes)
+                return null;
 
-            for (int i = 0; i < fields.Length; i++)
+            for (int i = 0; i < frameInfo.Fields.Count; i++)
             {
-                var fi = FieldInfo.FromSystem(fields[i]);
-
-                if (FieldLengths[i] != (byte)fi.FieldLength)
-                    return false;
+                var fi = frameInfo.Fields[i];
+                if (FieldLengths[i] != fi.FieldLength)
+                    return null;
                 if (FieldNames[i] != fi.FieldName)
-                    return false;
-
-                Debug.Assert((ulong)fi.FieldType < 16);
-                fieldTypes |= (ulong)fi.FieldType << (i << 2);
+                    return null;
             }
 
-            if (FieldCount != (byte)fields.Length)
-                return false;
-            if (FieldTypes != fieldTypes)
-                return false;
-
-            return true;
+            return frameInfo;
         }
     }
 }

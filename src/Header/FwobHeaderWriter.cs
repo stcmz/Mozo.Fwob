@@ -27,28 +27,28 @@ namespace Fwob.Header
 
             // pos 6: 16 bytes (allow up to 16 fields)
             Debug.Assert(header.FieldLengths != null);
-            Debug.Assert(header.FieldLengths.Length <= FwobLimits.MaxFields);
+            Debug.Assert(header.FieldLengths.Length == header.FieldCount);
             bw.Write(header.FieldLengths);
+
+            if (header.FieldLengths.Length < FwobLimits.MaxFields)
+                bw.Write(new byte[FwobLimits.MaxFields - header.FieldLengths.Length]);
 
             // pos 22: 8 bytes (up to 16 types, each has 4 bits, up to 16 types defined on FieldType)
             bw.Write(header.FieldTypes);
 
             // pos 30: 128 bytes (allow up to 16*8 chars)
-            Debug.Assert(header.FieldNames?.Length == FwobLimits.MaxFields);
-            for (int i = 0; i < FwobLimits.MaxFields; i++)
+            Debug.Assert(header.FieldNames != null);
+            Debug.Assert(header.FieldNames.Length == header.FieldCount);
+
+            for (int i = 0; i < header.FieldCount; i++)
             {
-                if (i < header.FieldCount)
-                {
-                    Debug.Assert(!string.IsNullOrWhiteSpace(header.FieldNames[i]));
-                    Debug.Assert(header.FieldNames[i]?.Length < FwobLimits.MaxFieldNameLength);
-                    bw.Write(header.FieldNames[i].PadRight(FwobLimits.MaxFieldNameLength));
-                }
-                else
-                {
-                    Debug.Assert(string.IsNullOrEmpty(header.FieldNames[i]));
-                    bw.Write(string.Empty.PadRight(FwobLimits.MaxFieldNameLength));
-                }
+                Debug.Assert(!string.IsNullOrWhiteSpace(header.FieldNames[i]));
+                Debug.Assert(header.FieldNames[i].Length < FwobLimits.MaxFieldNameLength);
+                bw.Write(header.FieldNames[i].PadRight(FwobLimits.MaxFieldNameLength).ToCharArray());
             }
+
+            if (header.FieldNames.Length < FwobLimits.MaxFields)
+                bw.Write(new byte[(FwobLimits.MaxFields - header.FieldNames.Length) * FwobLimits.MaxFieldNameLength]);
 
             //*********************** Size of String Tables (12 bytes) ************************//
 
@@ -67,11 +67,11 @@ namespace Fwob.Header
             //*********************** Frames (44 bytes) ************************//
 
             // pos 170: 8 bytes
-            Debug.Assert(header.FrameCount > 0);
+            Debug.Assert(header.FrameCount >= 0);
             bw.Write(header.FrameCount);
 
             // pos 178: 4 bytes, should be the sum of FieldLengths
-            Debug.Assert(header.FrameLength == header.FieldLengths.Take(header.FieldCount).Cast<int>().Sum());
+            Debug.Assert(header.FrameLength == header.FieldLengths.Take(header.FieldCount).Select(o => (int)o).Sum());
             bw.Write(header.FrameLength);
 
             // pos 182: 16 bytes (up to 16 chars)
