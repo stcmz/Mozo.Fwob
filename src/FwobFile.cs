@@ -430,7 +430,13 @@ namespace Fwob
 
             Debug.Assert(IsFileOpen);
 
-            if (Header.StringTableLength + Encoding.UTF8.GetByteCount(str) + Marshal.SizeOf(str.Length) > Header.StringTablePreservedLength)
+            var bytes = Encoding.UTF8.GetByteCount(str);
+            int length = bytes < 128 ? 1 : bytes < 128 * 128 ? 2 : bytes < 128 * 128 * 128 ? 3 : 4;
+            // 1 byte  length prefix: 00~7f (0~128-1)
+            // 2 bytes length prefix: 8001~ff01~8002~807f~ff7f (128~128^2-1)
+            // 3 bytes length prefix: 808001~ff8001~808101~807f01~ff7f01~808002~ffff7f (128^2~128^3-1)
+            // 4 bytes length prefix: 80808001~ffffff7f (128^3~128^4-1)
+            if (Header.StringTableLength + bytes + length > Header.StringTablePreservedLength)
                 throw new InternalBufferOverflowException("No more preserved space for appending string");
 
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
