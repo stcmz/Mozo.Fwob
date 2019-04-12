@@ -84,5 +84,38 @@ namespace Fwob.Header
             Debug.Assert(header.Title.Length <= FwobLimits.MaxTitleLength);
             bw.Write(header.Title.PadRight(FwobLimits.MaxTitleLength).ToCharArray());
         }
+
+        public static void UpdateTitle(this BinaryWriter bw, FwobHeader header)
+        {
+            bw.Seek(198, SeekOrigin.Begin);
+
+            // pos 198: 16 bytes (up to 16 chars)
+            Debug.Assert(!string.IsNullOrWhiteSpace(header.Title));
+            Debug.Assert(header.Title.Length <= FwobLimits.MaxTitleLength);
+            bw.Write(header.Title.PadRight(FwobLimits.MaxTitleLength).ToCharArray());
+        }
+
+        public static void UpdateFrameCount(this BinaryWriter bw, FwobHeader header)
+        {
+            bw.BaseStream.Seek(170, SeekOrigin.Begin);
+
+            // pos 170: 8 bytes
+            Debug.Assert(header.FrameCount >= 0);
+            bw.Write(header.FrameCount);
+        }
+
+        public static void UpdateStringTableLength(this BinaryWriter bw, FwobHeader header)
+        {
+            bw.BaseStream.Seek(158, SeekOrigin.Begin);
+
+            // pos 158: 4 bytes
+            Debug.Assert(header.StringCount >= 0);
+            bw.Write(header.StringCount);
+
+            // pos 162: 4 bytes
+            Debug.Assert(header.StringTableLength >= 0);
+            bw.Write(header.StringTableLength);
+        }
+
     }
 }

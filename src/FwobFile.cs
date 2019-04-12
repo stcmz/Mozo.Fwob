@@ -22,18 +22,20 @@ namespace Fwob
     {
         public override string Title
         {
-            get => title;
+            get => Header.Title;
             set
             {
                 if (value == null)
                     throw new ArgumentNullException(nameof(Title));
+                if (value.Length == 0)
+                    throw new ArgumentException(nameof(Title), $"Argument {{0}} can not be empty");
                 if (value.Length > FwobLimits.MaxTitleLength)
-                    throw new ArgumentException(nameof(Title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
-                title = value;
+                    throw new ArgumentOutOfRangeException(nameof(Title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
+                Header.Title = value;
+                using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+                    bw.UpdateTitle(Header);
             }
         }
-
-        private string title;
 
         public string FilePath { get; private set; }
 
@@ -47,13 +49,14 @@ namespace Fwob
         {
             if (title == null)
                 throw new ArgumentNullException(nameof(title));
+            if (title.Length == 0)
+                throw new ArgumentException(nameof(title), $"Argument {{0}} can not be empty");
             if (title.Length > FwobLimits.MaxTitleLength)
                 throw new ArgumentOutOfRangeException(nameof(title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
 
             var file = new FwobFile<TFrame, TKey>
             {
                 FrameInfo = FrameInfo.FromSystem<TFrame>(),
-                Title = title,
                 FilePath = path,
                 Stream = new FileStream(path, mode, access, share),
                 Header = FwobHeader.CreateNew<TFrame>(title),
@@ -89,8 +92,6 @@ namespace Fwob
 
                 if (Header.FileLength != br.BaseStream.Length)
                     throw new InvalidDataException($"Input file {path} length verification failed.");
-
-                title = Header.Title;
             }
         }
 
@@ -173,7 +174,6 @@ namespace Fwob
             using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, firstKey, true);
-
                 br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
 
                 for (; p < Header.FrameCount; p++)
@@ -199,7 +199,6 @@ namespace Fwob
             using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, firstKey, true);
-
                 br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
 
                 for (; p < Header.FrameCount; p++)
@@ -221,7 +220,6 @@ namespace Fwob
             using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
             {
                 long p = GetBound(br, lastKey, false);
-
                 br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
 
                 for (; p > 0; p--)
@@ -247,6 +245,7 @@ namespace Fwob
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
+                bw.Seek((int)Header.LastFramePosition, SeekOrigin.Begin);
 
                 var last = LastFrame;
                 long count = 0;
@@ -255,6 +254,7 @@ namespace Fwob
                     if (last != null && it.Current.Key.CompareTo(last.Key) < 0)
                     {
                         Header.FrameCount += count;
+                        bw.UpdateFrameCount(Header);
                         throw new InvalidDataException($"Frames should be in ascending order while appending.");
                     }
 
@@ -265,6 +265,7 @@ namespace Fwob
                 while (it.MoveNext());
 
                 Header.FrameCount += count;
+                bw.UpdateFrameCount(Header);
                 return count;
             }
         }
@@ -289,11 +290,13 @@ namespace Fwob
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
+                bw.Seek((int)Header.LastFramePosition, SeekOrigin.Begin);
 
                 foreach (var frame in list)
                     frame.SerializeFrame(bw);
 
                 Header.FrameCount += list.Count;
+                bw.UpdateFrameCount(Header);
                 return list.Count;
             }
         }
@@ -307,10 +310,11 @@ namespace Fwob
 
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
-                Debug.Assert(bw.BaseStream.Length >= Header.FirstFramePosition);
+                Debug.Assert(bw.BaseStream.Length > Header.FirstFramePosition);
                 bw.BaseStream.SetLength(Header.FirstFramePosition);
 
                 Header.FrameCount = 0;
+                bw.UpdateFrameCount(Header);
             }
         }
 
@@ -447,7 +451,7 @@ namespace Fwob
 
                 index = Header.StringCount++;
                 Header.StringTableLength = (int)(bw.BaseStream.Position - Header.StringTablePosition);
-                WriteStringTableLength(bw);
+                bw.UpdateStringTableLength(Header);
             }
 
             if (IsStringsLoaded)
@@ -474,13 +478,6 @@ namespace Fwob
             return false;
         }
 
-        void WriteStringTableLength(BinaryWriter bw)
-        {
-            bw.BaseStream.Seek(158, SeekOrigin.Begin);
-            bw.Write(Header.StringCount); // pos 158: StringCount
-            bw.Write(Header.StringTableLength); // pos 162: StringTableLength
-        }
-
         public override void ClearStrings()
         {
             Debug.Assert(IsFileOpen);
@@ -489,7 +486,7 @@ namespace Fwob
             {
                 Header.StringCount = 0;
                 Header.StringTableLength = 0;
-                WriteStringTableLength(bw);
+                bw.UpdateStringTableLength(Header);
             }
 
             if (IsStringsLoaded)

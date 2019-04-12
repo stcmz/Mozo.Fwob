@@ -65,7 +65,7 @@ namespace Fwob.Header
 
         public long FirstFramePosition => StringTablePosition + StringTablePreservedLength;
 
-        public long LastFramePosition => FileLength - FrameLength;
+        public long LastFramePosition => FirstFramePosition + FrameLength * FrameCount;
 
         public long FileLength => StringTablePosition + StringTablePreservedLength + FrameLength * FrameCount;
 
