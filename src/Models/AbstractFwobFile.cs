@@ -19,9 +19,9 @@ namespace Fwob.Models
 
         public abstract long FrameCount { get; }
 
-        public TFrame FirstFrame => GetFrame(0);
+        public virtual TFrame FirstFrame => GetFrame(0);
 
-        public TFrame LastFrame => GetFrame(FrameCount - 1);
+        public virtual TFrame LastFrame => GetFrame(FrameCount - 1);
 
         public abstract TFrame GetFrame(long index);
 

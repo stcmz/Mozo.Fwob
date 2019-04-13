@@ -92,6 +92,12 @@ namespace Fwob
 
                 if (Header.FileLength != br.BaseStream.Length)
                     throw new InvalidDataException($"Input file {path} length verification failed.");
+
+                if (FrameCount > 0)
+                {
+                    _firstFrame = GetFrame(0);
+                    _lastFrame = GetFrame(FrameCount - 1);
+                }
             }
         }
 
@@ -112,6 +118,13 @@ namespace Fwob
         }
 
         #region Implementations of IFrameQueryable
+
+        // Cached first and last frames
+        TFrame _firstFrame = null, _lastFrame = null;
+
+        public override TFrame FirstFrame => _firstFrame;
+
+        public override TFrame LastFrame => _lastFrame;
 
         public override long FrameCount
         {
@@ -253,6 +266,7 @@ namespace Fwob
                 {
                     if (last != null && it.Current.Key.CompareTo(last.Key) < 0)
                     {
+                        _lastFrame = last;
                         Header.FrameCount += count;
                         bw.UpdateFrameCount(Header);
                         throw new InvalidDataException($"Frames should be in ascending order while appending.");
@@ -260,10 +274,13 @@ namespace Fwob
 
                     it.Current.SerializeFrame(bw);
                     last = it.Current;
+                    if (_firstFrame == null)
+                        _firstFrame = last;
                     count++;
                 }
                 while (it.MoveNext());
 
+                _lastFrame = last;
                 Header.FrameCount += count;
                 bw.UpdateFrameCount(Header);
                 return count;
@@ -287,6 +304,9 @@ namespace Fwob
                 list.Add(frame);
             }
 
+            if (list.Count == 0)
+                return 0;
+
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
@@ -295,6 +315,9 @@ namespace Fwob
                 foreach (var frame in list)
                     frame.SerializeFrame(bw);
 
+                if (_firstFrame == null)
+                    _firstFrame = list[0];
+                _lastFrame = last;
                 Header.FrameCount += list.Count;
                 bw.UpdateFrameCount(Header);
                 return list.Count;
@@ -313,6 +336,7 @@ namespace Fwob
                 Debug.Assert(bw.BaseStream.Length > Header.FirstFramePosition);
                 bw.BaseStream.SetLength(Header.FirstFramePosition);
 
+                _firstFrame = _lastFrame = null;
                 Header.FrameCount = 0;
                 bw.UpdateFrameCount(Header);
             }
