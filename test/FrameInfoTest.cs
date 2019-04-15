@@ -3,6 +3,7 @@ using Fwob.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace FwobUnitTest
@@ -21,7 +22,7 @@ namespace FwobUnitTest
             public sbyte sb;
             public short sh;
             public ushort ush;
-            public long Long;
+            public long VeryLong;
             [Length(5)]
             public string Str;
             [StringTableIndex]
@@ -32,10 +33,8 @@ namespace FwobUnitTest
             public ulong Key => ULong;
         }
 
-        [TestMethod]
-        public void TestSupportedTypes()
+        private void ValidateFrameInfo(AbstractFwobFile<TypedTick, ulong> file)
         {
-            var file = new InMemoryFwobFile<TypedTick, ulong>("TestTypes");
             Assert.IsTrue(file.FrameInfo.FrameType == "TypedTick");
             Assert.IsTrue(file.FrameInfo.FrameLength == 59);
             Assert.IsTrue(file.FrameInfo.FieldTypes == 0x4430100212011ul);
@@ -64,7 +63,7 @@ namespace FwobUnitTest
             Assert.IsTrue(file.FrameInfo.Fields[6].FieldName == "sb");
             Assert.IsTrue(file.FrameInfo.Fields[7].FieldName == "sh");
             Assert.IsTrue(file.FrameInfo.Fields[8].FieldName == "ush");
-            Assert.IsTrue(file.FrameInfo.Fields[9].FieldName == "Long");
+            Assert.IsTrue(file.FrameInfo.Fields[9].FieldName == "VeryLong");
             Assert.IsTrue(file.FrameInfo.Fields[10].FieldName == "Str");
             Assert.IsTrue(file.FrameInfo.Fields[11].FieldName == "Idx");
             Assert.IsTrue(file.FrameInfo.Fields[12].FieldName == "Index");
@@ -82,6 +81,22 @@ namespace FwobUnitTest
             Assert.IsTrue(file.FrameInfo.Fields[10].FieldType == FieldType.Utf8String);
             Assert.IsTrue(file.FrameInfo.Fields[11].FieldType == FieldType.StringTableIndex);
             Assert.IsTrue(file.FrameInfo.Fields[11].FieldType == FieldType.StringTableIndex);
+        }
+
+        [TestMethod]
+        public void TestSupportedTypesInMemory()
+        {
+            var file = new InMemoryFwobFile<TypedTick, ulong>("TestTypes");
+            ValidateFrameInfo(file);
+        }
+
+        [TestMethod]
+        public void TestSupportedTypesInFile()
+        {
+            var temp = Path.GetTempFileName();
+            using (var file = FwobFile<TypedTick, ulong>.CreateNewFile(temp, "TestTypes", FileMode.Open))
+                ValidateFrameInfo(file);
+            File.Delete(temp);
         }
 
         class UnsupportedTick : IFrame<ulong>

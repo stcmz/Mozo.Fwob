@@ -12,34 +12,12 @@ namespace FwobUnitTest
     [TestClass]
     public class FwobFileTest
     {
-        class Tick : ISerializableFrame<int>
+        class Tick : IFrame<int>
         {
             public int Time;
             public double Value;
 
             public int Key => Time;
-
-            public void DeserializeFrame(BinaryReader br)
-            {
-                Time = br.ReadInt32();
-                Value = br.ReadDouble();
-            }
-
-            public int DeserializeKey(BinaryReader br)
-            {
-                return br.ReadInt32();
-            }
-
-            public void SerializeFrame(BinaryWriter bw)
-            {
-                bw.Write(Time);
-                bw.Write(Value);
-            }
-
-            public void SerializeKey(BinaryWriter bw)
-            {
-                bw.Write(Time);
-            }
 
             public override bool Equals(object obj)
             {
@@ -85,6 +63,7 @@ namespace FwobUnitTest
             Assert.IsTrue(file.FrameInfo.Fields[1].FieldName == "Value");
             Assert.IsTrue(file.FrameInfo.Fields[0].FieldType == FieldType.SignedInteger);
             Assert.IsTrue(file.FrameInfo.Fields[1].FieldType == FieldType.FloatingPoint);
+            file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 0);
             Assert.IsTrue(file.Title == "HelloFwob");
         }
@@ -187,11 +166,13 @@ namespace FwobUnitTest
         [TestMethod]
         public void TestReadingStringTableCached()
         {
+            file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 0);
             TestWritingStringTable();
             ValidateStringTableData();
             file.Dispose();
             file = new FwobFile<Tick, int>(_tempPath);
+            file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 3);
             ValidateStringTableData();
             TestClearingStringTable();
@@ -201,6 +182,7 @@ namespace FwobUnitTest
         [TestMethod]
         public void TestCachingStringTable()
         {
+            file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 0);
             TestWritingStringTable();
             Assert.IsTrue(file.Strings.Count == 3);
@@ -209,6 +191,7 @@ namespace FwobUnitTest
             Assert.AreEqual(file.Strings[2], "test_string3");
             file.Dispose();
             file = new FwobFile<Tick, int>(_tempPath);
+            file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 3);
             Assert.AreEqual(file.Strings[0], "mystr");
             Assert.AreEqual(file.Strings[1], "hello2");
