@@ -37,6 +37,9 @@ namespace Fwob.Models
                 fis.Add(fi);
             }
 
+            // Key should be the first field and must be with the same type as Key property
+            Debug.Assert(fields[0].FieldType == frameType.GetProperty("Key").PropertyType);
+
             return new FrameInfo
             {
                 Fields = fis,

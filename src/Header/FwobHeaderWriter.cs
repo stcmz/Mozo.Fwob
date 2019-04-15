@@ -43,7 +43,7 @@ namespace Fwob.Header
             for (int i = 0; i < header.FieldCount; i++)
             {
                 Debug.Assert(!string.IsNullOrWhiteSpace(header.FieldNames[i]));
-                Debug.Assert(header.FieldNames[i].Length < FwobLimits.MaxFieldNameLength);
+                Debug.Assert(header.FieldNames[i].Length <= FwobLimits.MaxFieldNameLength);
                 bw.Write(header.FieldNames[i].PadRight(FwobLimits.MaxFieldNameLength).ToCharArray());
             }
 

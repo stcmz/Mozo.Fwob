@@ -4,8 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using Fwob.Extensions;
 
 namespace Fwob
 {
@@ -17,7 +19,7 @@ namespace Fwob
     ///   3 Data Frames: pos 214 + StringTablePreservedLength, length FrameCount * FrameLength
     /// </summary>
     public class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, IDisposable
-        where TFrame : class, ISerializableFrame<TKey>, new()
+        where TFrame : class, IFrame<TKey>, new()
         where TKey : struct, IComparable<TKey>
     {
         public override string Title
@@ -104,7 +106,6 @@ namespace Fwob
         public void Close()
         {
             Dispose();
-            FilePath = null;
         }
 
         public void Dispose()
@@ -115,6 +116,11 @@ namespace Fwob
                 Stream.Dispose();
                 Stream = null;
             }
+            UnloadStringTable();
+            _firstFrame = null;
+            _lastFrame = null;
+            FilePath = null;
+            Header = null;
         }
 
         #region Implementations of IFrameQueryable
@@ -147,9 +153,7 @@ namespace Fwob
                 Debug.Assert(br.BaseStream.Length == Header.FileLength);
                 br.BaseStream.Seek(Header.FirstFramePosition + index * Header.FrameLength, SeekOrigin.Begin);
 
-                var frame = new TFrame();
-                frame.DeserializeFrame(br);
-                return frame;
+                return DeserializeFrame(br);
             }
         }
 
@@ -158,7 +162,6 @@ namespace Fwob
             Debug.Assert(br.BaseStream.Length == Header.FileLength);
 
             long pos = Header.FirstFramePosition;
-            var frame = new TFrame();
 
             long lo, hi;
             for (lo = 0, hi = Header.FrameCount; lo < hi;)
@@ -166,7 +169,7 @@ namespace Fwob
                 long mid = lo + (hi - lo >> 1);
                 br.BaseStream.Seek(pos + mid * Header.FrameLength, SeekOrigin.Begin);
 
-                int cmp = frame.DeserializeKey(br).CompareTo(key);
+                int cmp = br.Read<TKey>().CompareTo(key);
                 if (lower ? cmp < 0 : cmp <= 0)
                     lo = mid + 1;
                 else
@@ -174,6 +177,55 @@ namespace Fwob
             }
 
             return lo;
+        }
+
+        readonly System.Reflection.FieldInfo[] _fields = typeof(TFrame).GetFields();
+        readonly int[] _lengths = typeof(TFrame).GetFields()
+            .Select(o => o.GetCustomAttributes(typeof(LengthAttribute), false))
+            .Select(o => (LengthAttribute)o.FirstOrDefault())
+            .Select(o => o?.Length ?? 0)
+            .ToArray();
+
+        private void SerializeFrame(BinaryWriter bw, TFrame frame)
+        {
+            for (int i = 0; i < _fields.Length; i++)
+            {
+                var field = _fields[i];
+                var length = _lengths[i];
+
+                if (length > 0) // only string type defines length
+                {
+                    var str = (string)field.GetValue(frame);
+                    if (str?.Length > length)
+                        throw new InvalidDataException($"Length of field {field.FieldType.Name} is greater than defined length {length} while serializing a frame.");
+                    bw.Write((str ?? string.Empty).PadRight(length).ToCharArray());
+                }
+                else
+                {
+                    bw.Write(field.GetValue(frame));
+                }
+            }
+        }
+
+        private TFrame DeserializeFrame(BinaryReader br)
+        {
+            var frame = new TFrame();
+
+            for (int i = 0; i < _fields.Length; i++)
+            {
+                var field = _fields[i];
+                var length = _lengths[i];
+
+                object val;
+                if (length > 0) // only string type defines length
+                    val = new string(br.ReadChars(length)).TrimEnd();
+                else
+                    val = br.Read(field.FieldType);
+
+                field.SetValue(frame, val);
+            }
+
+            return frame;
         }
 
         public override IEnumerable<TFrame> GetFrames(TKey firstKey, TKey lastKey)
@@ -191,8 +243,7 @@ namespace Fwob
 
                 for (; p < Header.FrameCount; p++)
                 {
-                    var frame = new TFrame();
-                    frame.DeserializeFrame(br);
+                    var frame = DeserializeFrame(br);
 
                     if (frame.Key.CompareTo(lastKey) > 0)
                         yield break;
@@ -216,9 +267,7 @@ namespace Fwob
 
                 for (; p < Header.FrameCount; p++)
                 {
-                    var frame = new TFrame();
-                    frame.DeserializeFrame(br);
-                    yield return frame;
+                    yield return DeserializeFrame(br);
                 }
             }
         }
@@ -237,9 +286,7 @@ namespace Fwob
 
                 for (; p > 0; p--)
                 {
-                    var frame = new TFrame();
-                    frame.DeserializeFrame(br);
-                    yield return frame;
+                    yield return DeserializeFrame(br);
                 }
             }
         }
@@ -272,7 +319,7 @@ namespace Fwob
                         throw new InvalidDataException($"Frames should be in ascending order while appending.");
                     }
 
-                    it.Current.SerializeFrame(bw);
+                    SerializeFrame(bw, it.Current);
                     last = it.Current;
                     if (_firstFrame == null)
                         _firstFrame = last;
@@ -313,7 +360,7 @@ namespace Fwob
                 bw.Seek((int)Header.LastFramePosition, SeekOrigin.Begin);
 
                 foreach (var frame in list)
-                    frame.SerializeFrame(bw);
+                    SerializeFrame(bw, frame);
 
                 if (_firstFrame == null)
                     _firstFrame = list[0];
@@ -380,14 +427,18 @@ namespace Fwob
             }
         }
 
-        public override IReadOnlyList<string> Strings
+        public void UnloadStringTable()
         {
-            get
-            {
-                LoadStringTable();
-                return _strings;
-            }
+            if (!IsStringsLoaded)
+                return;
+
+            _strings.Clear();
+            _stringDict.Clear();
+            _strings = null;
+            _stringDict = null;
         }
+
+        public override IReadOnlyList<string> Strings => _strings;
 
         public override int StringCount
         {
@@ -460,6 +511,7 @@ namespace Fwob
 
             var bytes = Encoding.UTF8.GetByteCount(str);
             int length = bytes < 128 ? 1 : bytes < 128 * 128 ? 2 : bytes < 128 * 128 * 128 ? 3 : 4;
+            // A string is serialized with a 7-bit encoded integer prefix
             // 1 byte  length prefix: 00~7f (0~128-1)
             // 2 bytes length prefix: 8001~ff01~8002~807f~ff7f (128~128^2-1)
             // 3 bytes length prefix: 808001~ff8001~808101~807f01~ff7f01~808002~ffff7f (128^2~128^3-1)
