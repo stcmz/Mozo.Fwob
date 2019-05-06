@@ -16,13 +16,17 @@ namespace FwobUnitTest
         {
             public int Time;
             public double Value;
+            [Length(4)]
+            public string Str;
 
             public int Key => Time;
 
             public override bool Equals(object obj)
             {
                 if (obj is Tick that)
-                    return this.Time == that.Time && this.Value == that.Value;
+                    return this.Time == that.Time
+                        && this.Value == that.Value
+                        && (this.Str == that.Str || this.Str == null && that.Str == "" || this.Str == "" && that.Str == null);
                 return false;
             }
         }
@@ -54,15 +58,18 @@ namespace FwobUnitTest
             Assert.IsTrue(file.StringCount == 0);
             Assert.IsTrue(file.FrameCount == 0);
             Assert.IsTrue(file.FrameInfo.FrameType == "Tick");
-            Assert.IsTrue(file.FrameInfo.FrameLength == 12);
-            Assert.IsTrue(file.FrameInfo.FieldTypes == 0x20);
-            Assert.IsTrue(file.FrameInfo.Fields.Count == 2);
+            Assert.IsTrue(file.FrameInfo.FrameLength == 16);
+            Assert.IsTrue(file.FrameInfo.FieldTypes == 0x320);
+            Assert.IsTrue(file.FrameInfo.Fields.Count == 3);
             Assert.IsTrue(file.FrameInfo.Fields[0].FieldLength == 4);
             Assert.IsTrue(file.FrameInfo.Fields[1].FieldLength == 8);
+            Assert.IsTrue(file.FrameInfo.Fields[2].FieldLength == 4);
             Assert.IsTrue(file.FrameInfo.Fields[0].FieldName == "Time");
             Assert.IsTrue(file.FrameInfo.Fields[1].FieldName == "Value");
+            Assert.IsTrue(file.FrameInfo.Fields[2].FieldName == "Str");
             Assert.IsTrue(file.FrameInfo.Fields[0].FieldType == FieldType.SignedInteger);
             Assert.IsTrue(file.FrameInfo.Fields[1].FieldType == FieldType.FloatingPoint);
+            Assert.IsTrue(file.FrameInfo.Fields[2].FieldType == FieldType.Utf8String);
             file.LoadStringTable();
             Assert.IsTrue(file.Strings.Count == 0);
             Assert.IsTrue(file.Title == "HelloFwob");
@@ -552,6 +559,47 @@ namespace FwobUnitTest
         {
             AddFramesPartially();
             ValidateFramesPartially();
+        }
+
+        [TestMethod]
+        public void TestStringField()
+        {
+            var t = new Tick { Time = 987, Value = 123.456, Str = null };
+            Assert.IsTrue(file.AppendFrames(t) == 1);
+            Assert.AreEqual(file.GetFrame(0), t);
+            Assert.AreEqual(file.LastFrame, t);
+            Assert.IsTrue(file.FrameCount == 1);
+            t.Str = "";
+            Assert.IsTrue(file.AppendFrames(t) == 1);
+            Assert.AreEqual(file.GetFrame(1), t);
+            Assert.AreEqual(file.LastFrame, t);
+            Assert.IsTrue(file.FrameCount == 2);
+            t.Str = "a";
+            Assert.IsTrue(file.AppendFrames(t) == 1);
+            Assert.AreEqual(file.GetFrame(2), t);
+            Assert.AreEqual(file.LastFrame, t);
+            Assert.IsTrue(file.FrameCount == 3);
+            t.Str = "abcd";
+            Assert.IsTrue(file.AppendFrames(t) == 1);
+            Assert.AreEqual(file.GetFrame(3), t);
+            Assert.AreEqual(file.LastFrame, t);
+            Assert.IsTrue(file.FrameCount == 4);
+            t.Str = "abcde";
+            Assert.ThrowsException<InvalidDataException>(() => file.AppendFrames(tick));
+            Assert.IsTrue(file.FrameCount == 4);
+
+            file.Dispose();
+            file = new FwobFile<Tick, int>(_tempPath);
+
+            Assert.IsTrue(file.FrameCount == 4);
+            t.Str = null;
+            Assert.AreEqual(file.GetFrame(0), t);
+            t.Str = "";
+            Assert.AreEqual(file.GetFrame(1), t);
+            t.Str = "a";
+            Assert.AreEqual(file.GetFrame(2), t);
+            t.Str = "abcd";
+            Assert.AreEqual(file.GetFrame(3), t);
         }
 
         [TestMethod]
