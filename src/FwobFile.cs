@@ -198,9 +198,9 @@ namespace Fwob
 
                 if (length > 0) // string
                 {
-                    // [Expression] if (frame != null && frame.{field} > length) throw new InvalidDataException("...");
+                    // [Expression] if (frame.{field} != null && frame.{field} > length) throw new InvalidDataException("...");
                     var lengthProp = Expression.Property(fieldExp, typeof(string).GetProperty("Length")); // frame.{field}.Length
-                    var notNull = Expression.NotEqual(frame, Expression.Constant(null)); // frame != null
+                    var notNull = Expression.NotEqual(fieldExp, Expression.Constant(null)); // frame.{field} != null
                     var greaterThan = Expression.GreaterThan(lengthProp, Expression.Constant(length)); // ... > length
                     var exceptionMsg = Expression.Constant($"Length of field {fieldInfo.Name} is greater than defined length {length} while serializing a frame.");
                     var exceptionExp = Expression.New(typeof(InvalidDataException).GetConstructor(new[] { typeof(string) }), exceptionMsg); // new InvalidDataException(...)
