@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Linq.Expressions;
 using System.Text;
-using Fwob.Extensions;
 
 namespace Fwob
 {
@@ -169,7 +168,7 @@ namespace Fwob
                 long mid = lo + (hi - lo >> 1);
                 br.BaseStream.Seek(pos + mid * Header.FrameLength, SeekOrigin.Begin);
 
-                int cmp = br.Read<TKey>().CompareTo(key);
+                int cmp = DeserializeKey(br).CompareTo(key);
                 if (lower ? cmp < 0 : cmp <= 0)
                     lo = mid + 1;
                 else
@@ -179,54 +178,125 @@ namespace Fwob
             return lo;
         }
 
-        readonly System.Reflection.FieldInfo[] _fields = typeof(TFrame).GetFields();
-        readonly int[] _lengths = typeof(TFrame).GetFields()
-            .Select(o => o.GetCustomAttributes(typeof(LengthAttribute), false))
-            .Select(o => (LengthAttribute)o.FirstOrDefault())
-            .Select(o => o?.Length ?? 0)
-            .ToArray();
-
-        private void SerializeFrame(BinaryWriter bw, TFrame frame)
+        private static Action<BinaryWriter, TFrame> GenerateFrameSerializer()
         {
-            for (int i = 0; i < _fields.Length; i++)
-            {
-                var field = _fields[i];
-                var length = _lengths[i];
+            var bw = Expression.Parameter(typeof(BinaryWriter), "bw");
+            var frame = Expression.Parameter(typeof(TFrame), "frame");
 
-                if (length > 0) // only string type defines length
+            var expressions = new List<Expression>();
+
+            foreach (var fieldInfo in typeof(TFrame).GetFields())
+            {
+                var fieldType = fieldInfo.FieldType;
+                var length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
+                    .Cast<LengthAttribute>()
+                    .FirstOrDefault()
+                    ?.Length ?? 0;
+
+                Expression valueParam;
+                var fieldExp = Expression.Field(frame, fieldInfo); // frame.{field}
+
+                if (length > 0) // string
                 {
-                    var str = (string)field.GetValue(frame);
-                    if (str?.Length > length)
-                        throw new InvalidDataException($"Length of field {field.FieldType.Name} is greater than defined length {length} while serializing a frame.");
-                    bw.Write((str ?? string.Empty).PadRight(length).ToCharArray());
+                    // [Expression] if (frame != null && frame.{field} > length) throw new InvalidDataException("...");
+                    var lengthProp = Expression.Property(fieldExp, typeof(string).GetProperty("Length")); // frame.{field}.Length
+                    var notNull = Expression.NotEqual(frame, Expression.Constant(null)); // frame != null
+                    var greaterThan = Expression.GreaterThan(lengthProp, Expression.Constant(length)); // ... > length
+                    var exceptionMsg = Expression.Constant($"Length of field {fieldInfo.Name} is greater than defined length {length} while serializing a frame.");
+                    var exceptionExp = Expression.New(typeof(InvalidDataException).GetConstructor(new[] { typeof(string) }), exceptionMsg); // new InvalidDataException(...)
+                    var ifExp = Expression.IfThen(Expression.AndAlso(notNull, greaterThan), Expression.Throw(exceptionExp)); // if (...) throw ...
+                    expressions.Add(ifExp);
+
+                    // [Expression] (frame.{field} ?? string.Empty).PadRight(length).ToCharArray()
+                    var padRightMethod = typeof(string).GetMethod("PadRight", new[] { typeof(int) });
+                    var coalescing = Expression.Coalesce(fieldExp, Expression.Constant(string.Empty)); // frame.{field} ?? string.Empty
+                    valueParam = Expression.Call(coalescing, padRightMethod, Expression.Constant(length)); // {...}.PadRight(length)
+
+                    var toCharArrayMethod = typeof(string).GetMethod("ToCharArray", new Type[0]);
+                    valueParam = Expression.Call(valueParam, toCharArrayMethod); // {valueParam}.ToCharArray()
+
+                    fieldType = typeof(char[]);
                 }
                 else
                 {
-                    bw.Write(field.GetValue(frame));
+                    // [Expression] frame.{field}
+                    valueParam = fieldExp;
                 }
+
+                var writeMethod = typeof(BinaryWriter).GetMethod("Write", new[] { fieldType })
+                    ?? throw new NotSupportedException($"Type of field {fieldInfo.Name} in {typeof(TFrame)} is not supported");
+
+                // [Expression] bw.Write({valueParam});
+                var assignExp = Expression.Call(bw, writeMethod, valueParam);
+                expressions.Add(assignExp);
             }
+
+            var blockExp = Expression.Block(expressions);
+
+            return Expression.Lambda<Action<BinaryWriter, TFrame>>(blockExp, bw, frame).Compile();
         }
 
-        private TFrame DeserializeFrame(BinaryReader br)
+        private static Func<BinaryReader, TFrame> GenerateFrameDeserializer()
         {
-            var frame = new TFrame();
+            var br = Expression.Parameter(typeof(BinaryReader), "br");
 
-            for (int i = 0; i < _fields.Length; i++)
+            var expressions = new List<Expression>();
+            var frame = Expression.Variable(typeof(TFrame), "frame");
+            var newFrameExp = Expression.Assign(frame, Expression.New(typeof(TFrame))); // var frame = new TFrame()
+            expressions.Add(newFrameExp);
+
+            foreach (var fieldInfo in typeof(TFrame).GetFields())
             {
-                var field = _fields[i];
-                var length = _lengths[i];
+                var fieldType = fieldInfo.FieldType;
+                var length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
+                    .Cast<LengthAttribute>()
+                    .FirstOrDefault()
+                    ?.Length ?? 0;
 
-                object val;
-                if (length > 0) // only string type defines length
-                    val = new string(br.ReadChars(length)).TrimEnd();
+                Expression valueParam;
+                if (length > 0) // string
+                {
+                    var readMethod = typeof(BinaryReader).GetMethod("ReadChars", new[] { typeof(int) });
+                    valueParam = Expression.Call(br, readMethod, Expression.Constant(length, typeof(int))); // br.ReadChars(length)
+
+                    var ctor = typeof(string).GetConstructor(new[] { typeof(char[]) });
+                    var trimEndMethod = typeof(string).GetMethod("TrimEnd", new Type[0]);
+                    valueParam = Expression.Call(Expression.New(ctor, valueParam), trimEndMethod); // new string(...).TrimEnd()
+                }
                 else
-                    val = br.Read(field.FieldType);
+                {
+                    var readMethod = typeof(BinaryReader).GetMethod($"Read{fieldType.Name}") ??
+                        throw new NotSupportedException($"Type of field {fieldInfo.Name} in {typeof(TFrame)} is not supported");
+                    valueParam = Expression.Call(br, readMethod); // br.Read{fieldType}()
+                }
 
-                field.SetValue(frame, val);
+                var assignExp = Expression.Assign(Expression.Field(frame, fieldInfo), valueParam); // frame.{field} = ...
+                expressions.Add(assignExp);
             }
 
-            return frame;
+            expressions.Add(frame); // return frame
+            var blockExp = Expression.Block(new[] { frame }, expressions);
+
+            return Expression.Lambda<Func<BinaryReader, TFrame>>(blockExp, br).Compile();
         }
+
+        private static Func<BinaryReader, TKey> GenerateKeyDeserializer()
+        {
+            var keyField = typeof(TFrame).GetFields().FirstOrDefault();
+            if (keyField.FieldType != typeof(TKey))
+                throw new ArgumentException($"Incorrect type of the first field {keyField.Name}. Must be {typeof(TKey).Name} as defined by {nameof(TKey)}.");
+
+            var br = Expression.Parameter(typeof(BinaryReader), "br");
+            var readMethod = typeof(BinaryReader).GetMethod($"Read{keyField.FieldType.Name}");
+
+            return Expression.Lambda<Func<BinaryReader, TKey>>(Expression.Call(br, readMethod), br).Compile();
+        }
+
+        private static Action<BinaryWriter, TFrame> SerializeFrame { get; } = GenerateFrameSerializer();
+
+        private static Func<BinaryReader, TFrame> DeserializeFrame { get; } = GenerateFrameDeserializer();
+
+        private static Func<BinaryReader, TKey> DeserializeKey { get; } = GenerateKeyDeserializer();
 
         public override IEnumerable<TFrame> GetFrames(TKey firstKey, TKey lastKey)
         {
