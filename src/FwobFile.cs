@@ -44,7 +44,7 @@ namespace Fwob
 
         public FwobHeader Header { get; private set; }
 
-        bool IsFileOpen => Stream != null && FilePath != null && Header != null;
+        private bool IsFileOpen => Stream != null && FilePath != null && Header != null;
 
         public static FwobFile<TFrame, TKey> CreateNewFile(string path, string title, FileMode mode = FileMode.CreateNew, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.Read)
         {
@@ -70,6 +70,77 @@ namespace Fwob
             }
 
             return file;
+        }
+
+        /// <summary>
+        /// Split a fwob file into multiple segments with <paramref name="firstKeys"/>
+        /// being the first key of a segment (except the first segment).
+        /// </summary>
+        /// <param name="srcPath">File path to be loaded and splitted.</param>
+        /// <param name="firstKeys">Keys that end a segment.</param>
+        public static void Split(string srcPath, params TKey[] firstKeys)
+        {
+            if (firstKeys.Length == 0)
+                throw new ArgumentException("Argument {0} must contain at least one separating key", nameof(firstKeys));
+
+            for (int i = 1; i < firstKeys.Length; i++)
+                if (firstKeys[i].CompareTo(firstKeys[i - 1]) <= 0)
+                    throw new ArgumentException("Argument {0} must be in strictly ascending order", nameof(firstKeys));
+
+            if (!File.Exists(srcPath))
+                throw new FileNotFoundException("Fwob file not found", srcPath);
+
+            using (var srcFile = new FwobFile<TFrame, TKey>(srcPath, FileAccess.Read))
+            {
+                if (srcFile.FrameCount == 0)
+                    throw new InvalidOperationException($"Fwob file {srcFile} is empty");
+
+                if (firstKeys.First().CompareTo(srcFile.FirstFrame.Key) < 0)
+                    throw new ArgumentException("First item in argument {0} beyonds file beginning", nameof(firstKeys));
+
+                if (firstKeys.Last().CompareTo(srcFile.LastFrame.Key) > 0)
+                    throw new ArgumentException("Last item in argument {0} beyonds file ending", nameof(firstKeys));
+
+                using (var br = new BinaryReader(srcFile.Stream, Encoding.UTF8, true))
+                {
+                    long[] firstIndices = new[] { 0L }
+                        .Concat(firstKeys.Select(key => srcFile.GetBound(br, key, true)))
+                        .Concat(new[] { srcFile.FrameCount })
+                        .ToArray();
+
+                    long framesWritten = 0;
+
+                    for (int i = 0; i < firstIndices.Length - 1; i++)
+                    {
+                        string dstPath = Path.ChangeExtension(srcPath, $".part{i}.fwob");
+
+                        long frameCount = firstIndices[i + 1] - firstIndices[i];
+                        long dataPosition = srcFile.Header.FirstFramePosition + firstIndices[i] * srcFile.Header.FrameLength;
+                        long dataLength = frameCount * srcFile.Header.FrameLength;
+
+                        using (var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        using (var bw = new BinaryWriter(stream))
+                        {
+                            // clone header and string table
+                            br.BaseStream.Seek(0, SeekOrigin.Begin);
+                            bw.Write(br.ReadBytes((int)srcFile.Header.FirstFramePosition));
+
+                            // clone frame data
+                            br.BaseStream.Seek(dataPosition, SeekOrigin.Begin);
+
+                            int bufSize = 4 * 1024 * 1024;
+                            for (long k = dataLength; k > 0; k -= bufSize)
+                                bw.Write(br.ReadBytes((int)Math.Min(k, bufSize)));
+
+                            // update frame count
+                            bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
+                            framesWritten += frameCount;
+                        }
+                    }
+
+                    Debug.Assert(framesWritten == srcFile.FrameCount, $"Frames written inconsistent: {framesWritten} != {srcFile.FrameCount}");
+                }
+            }
         }
 
         private FwobFile() { }
@@ -125,7 +196,7 @@ namespace Fwob
         #region Implementations of IFrameQueryable
 
         // Cached first and last frames
-        TFrame _firstFrame = null, _lastFrame = null;
+        private TFrame _firstFrame = null, _lastFrame = null;
 
         public override TFrame FirstFrame => _firstFrame;
 
@@ -156,7 +227,7 @@ namespace Fwob
             }
         }
 
-        long GetBound(BinaryReader br, TKey key, bool lower)
+        private long GetBound(BinaryReader br, TKey key, bool lower)
         {
             Debug.Assert(br.BaseStream.Length == Header.FileLength);
 
@@ -188,7 +259,7 @@ namespace Fwob
             foreach (var fieldInfo in typeof(TFrame).GetFields())
             {
                 var fieldType = fieldInfo.FieldType;
-                var length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
+                int length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
                     .Cast<LengthAttribute>()
                     .FirstOrDefault()
                     ?.Length ?? 0;
@@ -248,7 +319,7 @@ namespace Fwob
             foreach (var fieldInfo in typeof(TFrame).GetFields())
             {
                 var fieldType = fieldInfo.FieldType;
-                var length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
+                int length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
                     .Cast<LengthAttribute>()
                     .FirstOrDefault()
                     ?.Length ?? 0;
@@ -463,9 +534,10 @@ namespace Fwob
 
         #region Implementations of IStringTable
 
-        bool IsStringsLoaded => _strings != null;
-        List<string> _strings = null;
-        Dictionary<string, int> _stringDict = null;
+        private bool IsStringsLoaded => _strings != null;
+
+        private List<string> _strings = null;
+        private Dictionary<string, int> _stringDict = null;
 
         public void LoadStringTable()
         {
@@ -484,7 +556,7 @@ namespace Fwob
 
                 for (int i = 0; i < Header.StringCount; i++)
                 {
-                    var str = br.ReadString();
+                    string str = br.ReadString();
                     dict[str] = list.Count;
                     list.Add(str);
                 }
@@ -521,7 +593,7 @@ namespace Fwob
             }
         }
 
-        IEnumerable<(int index, string str)> LookupStringInFile()
+        private IEnumerable<(int index, string str)> LookupStringInFile()
         {
             Debug.Assert(IsFileOpen);
 
@@ -579,7 +651,7 @@ namespace Fwob
 
             Debug.Assert(IsFileOpen);
 
-            var bytes = Encoding.UTF8.GetByteCount(str);
+            int bytes = Encoding.UTF8.GetByteCount(str);
             int length = bytes < 128 ? 1 : bytes < 128 * 128 ? 2 : bytes < 128 * 128 * 128 ? 3 : 4;
             // A string is serialized with a 7-bit encoded integer prefix
             // 1 byte  length prefix: 00~7f (0~128-1)
