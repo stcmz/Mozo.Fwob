@@ -1,18 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Fwob;
 using Fwob.Header;
 using Fwob.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.IO;
+using System.Linq;
 
 namespace FwobUnitTest
 {
     [TestClass]
     public class FwobFileTest
     {
-        class Tick : IFrame<int>
+        private class Tick : IFrame<int>
         {
             public int Time;
             public double Value;
@@ -31,8 +30,13 @@ namespace FwobUnitTest
             }
         }
 
-        string _tempPath = null;
-        FwobFile<Tick, int> file = null;
+        private string _tempPath = null;
+        private FwobFile<Tick, int> file = null;
+        private readonly Tick tick = new Tick { Time = 12, Value = 99.88 };
+        private readonly Tick tick2 = new Tick { Time = 12, Value = 44456.0111 };
+        private readonly Tick tick3 = new Tick { Time = 12, Value = 1234.56 };
+        private readonly Tick tick4 = new Tick { Time = 13, Value = 44456.0111 };
+        private readonly Tick tick5 = new Tick { Time = 100, Value = 77234.56 };
 
         [TestInitialize]
         public void Initialize()
@@ -47,6 +51,36 @@ namespace FwobUnitTest
             file.Dispose();
             File.Delete(_tempPath);
         }
+
+        #region Header testing
+        [TestMethod]
+        public void TestTitle()
+        {
+            Assert.IsTrue(file.Title == "HelloFwob");
+
+            file.Title = "abcde";
+            Assert.AreEqual(file.Title, "abcde");
+            file.Dispose();
+            file = new FwobFile<Tick, int>(_tempPath);
+            Assert.AreEqual(file.Title, "abcde");
+
+            Assert.ThrowsException<ArgumentException>(() => file.Title = "");
+            Assert.AreEqual(file.Title, "abcde");
+            file.Dispose();
+            file = new FwobFile<Tick, int>(_tempPath);
+            Assert.AreEqual(file.Title, "abcde");
+
+            file.Title = "0123456789abcdef";
+            Assert.AreEqual(file.Title, "0123456789abcdef");
+            file.Dispose();
+            file = new FwobFile<Tick, int>(_tempPath);
+            Assert.AreEqual(file.Title, "0123456789abcdef");
+
+            Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => file.Title = "0123456789abcdefg");
+            Assert.AreEqual(file.Title, "0123456789abcdef");
+        }
+        #endregion
 
         #region StringTable testing
 
@@ -236,34 +270,7 @@ namespace FwobUnitTest
 
         #endregion
 
-        [TestMethod]
-        public void TestTitle()
-        {
-            Assert.IsTrue(file.Title == "HelloFwob");
-
-            file.Title = "abcde";
-            Assert.AreEqual(file.Title, "abcde");
-            file.Dispose();
-            file = new FwobFile<Tick, int>(_tempPath);
-            Assert.AreEqual(file.Title, "abcde");
-
-            Assert.ThrowsException<ArgumentException>(() => file.Title = "");
-            Assert.AreEqual(file.Title, "abcde");
-            file.Dispose();
-            file = new FwobFile<Tick, int>(_tempPath);
-            Assert.AreEqual(file.Title, "abcde");
-
-            file.Title = "0123456789abcdef";
-            Assert.AreEqual(file.Title, "0123456789abcdef");
-            file.Dispose();
-            file = new FwobFile<Tick, int>(_tempPath);
-            Assert.AreEqual(file.Title, "0123456789abcdef");
-
-            Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => file.Title = "0123456789abcdefg");
-            Assert.AreEqual(file.Title, "0123456789abcdef");
-        }
-
+        #region Frame data testing
         [TestMethod]
         public void TestNoFrame()
         {
@@ -347,12 +354,6 @@ namespace FwobUnitTest
             file.ClearFrames();
             TestNoFrame();
         }
-
-        Tick tick = new Tick { Time = 12, Value = 99.88 };
-        Tick tick2 = new Tick { Time = 12, Value = 44456.0111 };
-        Tick tick3 = new Tick { Time = 12, Value = 1234.56 };
-        Tick tick4 = new Tick { Time = 13, Value = 44456.0111 };
-        Tick tick5 = new Tick { Time = 100, Value = 77234.56 };
 
         [TestMethod]
         public void TestFramesSameKey()
@@ -562,7 +563,7 @@ namespace FwobUnitTest
         }
 
         [TestMethod]
-        public void TestStringField()
+        public void TestFramesStringField()
         {
             var t = new Tick { Time = 987, Value = 123.456, Str = null };
             Assert.IsTrue(file.AppendFrames(t) == 1);
@@ -665,7 +666,9 @@ namespace FwobUnitTest
             Assert.AreEqual(file.LastFrame, tick5);
             Assert.IsNotNull(file.FrameInfo);
         }
+        #endregion
 
+        #region Mixed and performance testing
         [TestMethod]
         public void TestMixingStringTableAndFrames()
         {
@@ -769,5 +772,107 @@ namespace FwobUnitTest
             Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString(""));
             Assert.AreEqual(file.FrameCount, 18 * 262);
         }
+        #endregion
+
+        #region
+        [TestMethod]
+        public void TestFileSplit()
+        {
+            file.Dispose();
+            Assert.ThrowsException<InvalidOperationException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 2));
+            file = new FwobFile<Tick, int>(_tempPath);
+
+            for (int i = 0; i < 485; i++)
+                Assert.IsTrue(file.AppendString(i.ToString()) == i);
+            Assert.IsTrue(
+                10000 == file.AppendFrames(
+                    Enumerable.Range(0, 10000)
+                        .Select(i => new Tick { Time = i, Value = i * 3.14, Str = i.ToString() })));
+            Assert.IsTrue(file.FrameCount == 10000);
+            Assert.AreEqual(file.FirstFrame, new Tick { Time = 0, Value = 0, Str = "0" });
+            Assert.AreEqual(file.LastFrame, new Tick { Time = 9999, Value = 9999 * 3.14, Str = "9999" });
+            file.Dispose();
+
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 0));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 1));
+            Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Split(_tempPath + ".nonexistence", 1, 2));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, -1));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 10000));
+
+            int baseLength = FwobHeader.HeaderLength + FwobHeader.DefaultStringTablePreservedLength;
+
+            FwobFile<Tick, int>.Split(_tempPath, 100);
+            string path0 = Path.ChangeExtension(_tempPath, ".part0.fwob");
+            string path1 = Path.ChangeExtension(_tempPath, ".part1.fwob");
+            Assert.IsTrue(File.Exists(path0));
+            Assert.IsTrue(File.Exists(path1));
+            Assert.IsTrue(new FileInfo(path0).Length == baseLength + 100 * 16);
+            Assert.IsTrue(new FileInfo(path1).Length == baseLength + 9900 * 16);
+            using (var ff = new FwobFile<Tick, int>(path0))
+            {
+                Assert.IsTrue(ff.FrameCount == 100);
+                Assert.AreEqual(ff.FirstFrame, new Tick { Time = 0, Value = 0, Str = "0" });
+                Assert.AreEqual(ff.LastFrame, new Tick { Time = 99, Value = 99 * 3.14, Str = "99" });
+                ff.LoadStringTable();
+                Assert.IsTrue(ff.Strings.Count == 485);
+                for (int i = 0; i < 485; i++)
+                    Assert.IsTrue(ff.Strings[i] == i.ToString());
+            }
+            using (var ff = new FwobFile<Tick, int>(path1))
+            {
+                Assert.IsTrue(ff.FrameCount == 9900);
+                Assert.AreEqual(ff.FirstFrame, new Tick { Time = 100, Value = 100 * 3.14, Str = "100" });
+                Assert.AreEqual(ff.LastFrame, new Tick { Time = 9999, Value = 9999 * 3.14, Str = "9999" });
+                ff.LoadStringTable();
+                Assert.IsTrue(ff.Strings.Count == 485);
+                for (int i = 0; i < 485; i++)
+                    Assert.IsTrue(ff.Strings[i] == i.ToString());
+            }
+
+            FwobFile<Tick, int>.Split(_tempPath, 1, 9999);
+            string path2 = Path.ChangeExtension(_tempPath, ".part2.fwob");
+            Assert.IsTrue(File.Exists(path0));
+            Assert.IsTrue(File.Exists(path1));
+            Assert.IsTrue(File.Exists(path2));
+            Assert.IsTrue(new FileInfo(path0).Length == baseLength + 1 * 16);
+            Assert.IsTrue(new FileInfo(path1).Length == baseLength + 9998 * 16);
+            Assert.IsTrue(new FileInfo(path2).Length == baseLength + 1 * 16);
+            using (var ff = new FwobFile<Tick, int>(path0))
+            {
+                ff.LoadStringTable();
+                Assert.IsTrue(ff.Strings.Count == 485);
+                for (int i = 0; i < 485; i++)
+                    Assert.IsTrue(ff.Strings[i] == i.ToString());
+                Assert.IsTrue(ff.FrameCount == 1);
+                Assert.AreEqual(ff.FirstFrame, new Tick { Time = 0, Value = 0, Str = "0" });
+                Assert.AreEqual(ff.LastFrame, new Tick { Time = 0, Value = 0, Str = "0" });
+            }
+            using (var ff = new FwobFile<Tick, int>(path1))
+            {
+                ff.LoadStringTable();
+                Assert.IsTrue(ff.Strings.Count == 485);
+                for (int i = 0; i < 485; i++)
+                    Assert.IsTrue(ff.Strings[i] == i.ToString());
+                Assert.IsTrue(ff.FrameCount == 9998);
+                Assert.AreEqual(ff.FirstFrame, new Tick { Time = 1, Value = 3.14, Str = "1" });
+                Assert.AreEqual(ff.LastFrame, new Tick { Time = 9998, Value = 9998 * 3.14, Str = "9998" });
+            }
+            using (var ff = new FwobFile<Tick, int>(path2))
+            {
+                ff.LoadStringTable();
+                Assert.IsTrue(ff.Strings.Count == 485);
+                for (int i = 0; i < 485; i++)
+                    Assert.IsTrue(ff.Strings[i] == i.ToString());
+                Assert.IsTrue(ff.FrameCount == 1);
+                Assert.AreEqual(ff.FirstFrame, new Tick { Time = 9999, Value = 9999 * 3.14, Str = "9999" });
+                Assert.AreEqual(ff.LastFrame, new Tick { Time = 9999, Value = 9999 * 3.14, Str = "9999" });
+            }
+
+            File.Delete(path0);
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+        #endregion
     }
 }
