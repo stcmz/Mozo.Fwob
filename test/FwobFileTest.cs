@@ -779,7 +779,9 @@ namespace FwobUnitTest
         public void TestFileSplit()
         {
             file.Dispose();
-            Assert.ThrowsException<InvalidOperationException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 2));
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<Tick, int>.Split(null));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath));
+            Assert.ThrowsException<FrameNotFoundException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 2));
             file = new FwobFile<Tick, int>(_tempPath);
 
             for (int i = 0; i < 485; i++)
@@ -793,7 +795,7 @@ namespace FwobUnitTest
             Assert.AreEqual(file.LastFrame, new Tick { Time = 9999, Value = 9999 * 3.14, Str = "9999" });
             file.Dispose();
 
-            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath));
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<Tick, int>.Split(_tempPath, null));
             Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 0));
             Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 1));
             Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Split(_tempPath + ".nonexistence", 1, 2));
@@ -872,6 +874,122 @@ namespace FwobUnitTest
             File.Delete(path0);
             File.Delete(path1);
             File.Delete(path2);
+        }
+
+        [TestMethod]
+        public void TestFileConcat()
+        {
+            file.Dispose();
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<Tick, int>.Concat(null));
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<Tick, int>.Concat(_tempPath, null));
+            Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Concat(_tempPath));
+            Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Concat(_tempPath, _tempPath + ".nonexistence"));
+
+            var path0 = _tempPath + ".part0.fwob";
+            var path1 = _tempPath + ".part1.fwob";
+            var path2 = _tempPath + ".part2.fwob";
+            Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+
+            // test empty files
+            var file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test"); file0.Dispose();
+            var file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test"); file1.Dispose();
+            var file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test2"); file2.Dispose();
+
+            Assert.ThrowsException<FrameNotFoundException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+
+            // test file title consistence
+            file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
+            file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
+            file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test2", FileMode.Create);
+
+            file0.AppendFrames(tick); file0.Dispose();
+            file1.AppendFrames(tick); file1.Dispose();
+            file2.AppendFrames(tick); file2.Dispose();
+
+            Assert.ThrowsException<FileTitleException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+
+            file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
+            file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
+            file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+
+            file0.AppendFrames(tick5); file0.Dispose();
+            file1.AppendFrames(tick4); file1.Dispose();
+            file2.AppendFrames(tick3); file2.Dispose();
+
+            Assert.ThrowsException<KeyOrderingException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+
+            file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
+            file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
+            file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+
+            file0.AppendString("str0"); file0.AppendFrames(tick2); file0.Dispose();
+            file1.AppendString("str0"); file1.AppendString("str1"); file1.AppendFrames(tick3); file1.Dispose();
+            file2.AppendString("str1"); file2.AppendFrames(tick4); file2.Dispose();
+
+            Assert.ThrowsException<StringTableException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+
+            FwobFile<Tick, int>.Concat(_tempPath, path0);
+            Assert.AreEqual(Convert.ToBase64String(File.ReadAllBytes(_tempPath)), Convert.ToBase64String(File.ReadAllBytes(path0)));
+
+            file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
+            file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
+            file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+
+            for (int i = 0; i < 48; i++)
+                Assert.IsTrue(file0.AppendString(i.ToString()) == i);
+            for (int i = 0; i < 485; i++)
+                Assert.IsTrue(file1.AppendString(i.ToString()) == i);
+            for (int i = 0; i < 85; i++)
+                Assert.IsTrue(file2.AppendString(i.ToString()) == i);
+
+            Assert.IsTrue(
+                10000 == file0.AppendFrames(
+                    Enumerable.Range(0, 10000)
+                        .Select(i => new Tick { Time = i, Value = i * 3.14, Str = i.ToString() })));
+            Assert.IsTrue(
+                7777 == file1.AppendFrames(
+                    Enumerable.Range(0, 7777)
+                        .Select(i => new Tick { Time = 10000 + i, Value = i * 2.14, Str = i.ToString() })));
+            Assert.IsTrue(
+                8888 == file2.AppendFrames(
+                    Enumerable.Range(0, 8888)
+                        .Select(i => new Tick { Time = 20000 + i, Value = i * 4.14, Str = i.ToString() })));
+
+            file0.Dispose();
+            file1.Dispose();
+            file2.Dispose();
+
+            FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2);
+
+            Assert.IsTrue(new FileInfo(_tempPath).Length == FwobHeader.HeaderLength + FwobHeader.DefaultStringTablePreservedLength + 26665 * 16);
+
+            file = new FwobFile<Tick, int>(_tempPath);
+            Assert.IsTrue(file.FrameCount == 26665);
+            Assert.IsTrue(file.StringCount == 485);
+            Assert.IsTrue(file.Title == "test");
+
+            file.LoadStringTable();
+            for (int i = 0; i < 485; i++)
+                Assert.IsTrue(file.Strings[i] == i.ToString());
+            file.UnloadStringTable();
+
+            int k = 0;
+            foreach (var frame in file.GetFramesAfter(0))
+            {
+                if (k < 10000)
+                    Assert.AreEqual(frame, new Tick { Time = k, Value = k * 3.14, Str = k.ToString() });
+                else if (k < 17777)
+                    Assert.AreEqual(frame, new Tick { Time = k, Value = (k - 10000) * 2.14, Str = (k - 10000).ToString() });
+                else
+                    Assert.AreEqual(frame, new Tick { Time = k + 2223, Value = (k - 17777) * 4.14, Str = (k - 17777).ToString() });
+                ++k;
+            }
+
+            file.Dispose();
+
+            File.Delete(_tempPath + ".part0.fwob");
+            File.Delete(_tempPath + ".part1.fwob");
+            File.Delete(_tempPath + ".part2.fwob");
         }
         #endregion
     }
