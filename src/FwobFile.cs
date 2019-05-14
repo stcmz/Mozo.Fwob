@@ -80,6 +80,12 @@ namespace Fwob
         /// <param name="firstKeys">Keys that end a segment.</param>
         public static void Split(string srcPath, params TKey[] firstKeys)
         {
+            if (srcPath == null)
+                throw new ArgumentNullException(nameof(srcPath));
+
+            if (firstKeys == null)
+                throw new ArgumentNullException(nameof(firstKeys));
+
             if (firstKeys.Length == 0)
                 throw new ArgumentException("Argument {0} must contain at least one separating key", nameof(firstKeys));
 
@@ -93,7 +99,7 @@ namespace Fwob
             using (var srcFile = new FwobFile<TFrame, TKey>(srcPath, FileAccess.Read))
             {
                 if (srcFile.FrameCount == 0)
-                    throw new InvalidOperationException($"Fwob file {srcFile} is empty");
+                    throw new FrameNotFoundException($"Fwob file {srcFile} is empty");
 
                 if (firstKeys.First().CompareTo(srcFile.FirstFrame.Key) < 0)
                     throw new ArgumentException("First item in argument {0} beyonds file beginning", nameof(firstKeys));
@@ -140,6 +146,97 @@ namespace Fwob
 
                     Debug.Assert(framesWritten == srcFile.FrameCount, $"Frames written inconsistent: {framesWritten} != {srcFile.FrameCount}");
                 }
+            }
+        }
+
+        public static void Concat(string dstPath, params string[] srcPaths)
+        {
+            if (dstPath == null)
+                throw new ArgumentNullException(nameof(dstPath));
+
+            if (srcPaths == null)
+                throw new ArgumentNullException(nameof(srcPaths));
+
+            if (srcPaths.Length == 0)
+                throw new ArgumentException("Argument {0} must contain at least one file path", nameof(srcPaths));
+
+            foreach (var path in srcPaths)
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("File {0} not found", path);
+
+            var fileList = new List<FwobFile<TFrame, TKey>>();
+            try
+            {
+                var strings = new List<string>();
+                FwobFile<TFrame, TKey> patFile = null;
+
+                foreach (var path in srcPaths)
+                {
+                    var file = new FwobFile<TFrame, TKey>(path, FileAccess.Read, FileShare.Read);
+                    var prevFile = fileList.LastOrDefault();
+                    fileList.Add(file);
+
+                    if (file.FrameCount == 0)
+                        throw new FrameNotFoundException($"File {path} is empty.");
+
+                    if (prevFile != null)
+                    {
+                        if (file.FirstFrame.Key.CompareTo(prevFile.LastFrame.Key) < 0)
+                            throw new KeyOrderingException($"First frame of {path} must be >= last frame in previous file.");
+                        if (file.Title != prevFile.Title)
+                            throw new FileTitleException($"Title of {path} must be identical as previous file.");
+                    }
+
+                    file.LoadStringTable();
+                    for (int i = Math.Min(strings.Count, file.Strings.Count) - 1; i >= 0; i--)
+                        if (file.Strings[i] != strings[i])
+                            throw new StringTableException($"String table of {path} incompatible at {i} with previous files ({file.Strings[i]}, {strings[i]}).");
+                    if (file.StringCount > strings.Count)
+                        patFile = file;
+                    for (int i = strings.Count; i < file.Strings.Count; i++)
+                        strings.Add(file.Strings[i]);
+                    file.UnloadStringTable();
+                }
+
+                using (var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var bw = new BinaryWriter(stream))
+                {
+                    // clone header and string table from pattern file
+                    using (var br = new BinaryReader(patFile.Stream, Encoding.UTF8, true))
+                    {
+                        br.BaseStream.Seek(0, SeekOrigin.Begin);
+                        bw.Write(br.ReadBytes((int)patFile.Header.FirstFramePosition));
+                    }
+
+                    // clone frame data from each source
+                    long frameCount = 0;
+                    foreach (var file in fileList)
+                    {
+                        using (var br = new BinaryReader(file.Stream))
+                        {
+                            br.BaseStream.Seek(file.Header.FirstFramePosition, SeekOrigin.Begin);
+
+                            long dataLength = file.FrameCount * file.Header.FrameLength;
+                            frameCount += file.FrameCount;
+                            int bufSize = 4 * 1024 * 1024;
+                            for (long k = dataLength; k > 0; k -= bufSize)
+                                bw.Write(br.ReadBytes((int)Math.Min(k, bufSize)));
+                        }
+                        file.Dispose();
+                    }
+
+                    // update frame count
+                    bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            finally
+            {
+                foreach (var file in fileList)
+                    file.Dispose();
             }
         }
 
@@ -269,12 +366,12 @@ namespace Fwob
 
                 if (length > 0) // string
                 {
-                    // [Expression] if (frame.{field} != null && frame.{field} > length) throw new InvalidDataException("...");
+                    // [Expression] if (frame.{field} != null && frame.{field} > length) throw new KeyOrderingException("...");
                     var lengthProp = Expression.Property(fieldExp, typeof(string).GetProperty("Length")); // frame.{field}.Length
                     var notNull = Expression.NotEqual(fieldExp, Expression.Constant(null)); // frame.{field} != null
                     var greaterThan = Expression.GreaterThan(lengthProp, Expression.Constant(length)); // ... > length
                     var exceptionMsg = Expression.Constant($"Length of field {fieldInfo.Name} is greater than defined length {length} while serializing a frame.");
-                    var exceptionExp = Expression.New(typeof(InvalidDataException).GetConstructor(new[] { typeof(string) }), exceptionMsg); // new InvalidDataException(...)
+                    var exceptionExp = Expression.New(typeof(KeyOrderingException).GetConstructor(new[] { typeof(string) }), exceptionMsg); // new KeyOrderingException(...)
                     var ifExp = Expression.IfThen(Expression.AndAlso(notNull, greaterThan), Expression.Throw(exceptionExp)); // if (...) throw ...
                     expressions.Add(ifExp);
 
