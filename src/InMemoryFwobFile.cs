@@ -19,7 +19,7 @@ namespace Fwob
                 if (value == null)
                     throw new ArgumentNullException(nameof(Title));
                 if (value.Length > FwobLimits.MaxTitleLength)
-                    throw new ArgumentException(nameof(Title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
+                    throw new ArgumentException(nameof(Title), $"Length of argument exceeded {FwobLimits.MaxTitleLength}");
                 title = value;
             }
         }

@@ -75,9 +75,9 @@ namespace Fwob.Header
             Debug.Assert(frameType.Name.Length <= FwobLimits.MaxFrameTypeLength);
 
             if (string.IsNullOrEmpty(title))
-                throw new ArgumentNullException(nameof(title), "Argument {0} should not be null or empty");
+                throw new ArgumentNullException(nameof(title), "Argument should not be null or empty");
             if (title.Length > FwobLimits.MaxTitleLength)
-                throw new ArgumentOutOfRangeException(nameof(title), title, $"Length of argument {{0}} exceeded MaxTitleLength {FwobLimits.MaxTitleLength}");
+                throw new ArgumentOutOfRangeException(nameof(title), title, $"Length of argument exceeded MaxTitleLength {FwobLimits.MaxTitleLength}");
 
             var frameInfo = FrameInfo.FromSystem(frameType);
 

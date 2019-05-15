@@ -29,9 +29,9 @@ namespace Fwob
                 if (value == null)
                     throw new ArgumentNullException(nameof(Title));
                 if (value.Length == 0)
-                    throw new ArgumentException(nameof(Title), $"Argument {{0}} can not be empty");
+                    throw new ArgumentException(nameof(Title), "Argument can not be empty");
                 if (value.Length > FwobLimits.MaxTitleLength)
-                    throw new ArgumentOutOfRangeException(nameof(Title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
+                    throw new ArgumentOutOfRangeException(nameof(Title), $"Length of argument exceeded {FwobLimits.MaxTitleLength}");
                 Header.Title = value;
                 using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
                     bw.UpdateTitle(Header);
@@ -53,9 +53,9 @@ namespace Fwob
             if (title == null)
                 throw new ArgumentNullException(nameof(title));
             if (title.Length == 0)
-                throw new ArgumentException(nameof(title), $"Argument {{0}} can not be empty");
+                throw new ArgumentException(nameof(title), "Argument can not be empty");
             if (title.Length > FwobLimits.MaxTitleLength)
-                throw new ArgumentOutOfRangeException(nameof(title), $"Length of argument {{0}} exceeded {FwobLimits.MaxTitleLength}");
+                throw new ArgumentOutOfRangeException(nameof(title), $"Length of argument exceeded {FwobLimits.MaxTitleLength}");
 
             var file = new FwobFile<TFrame, TKey>
             {
@@ -89,7 +89,7 @@ namespace Fwob
                 throw new ArgumentNullException(nameof(firstKeys));
 
             if (firstKeys.Length == 0)
-                throw new ArgumentException("Argument {0} must contain at least one separating key", nameof(firstKeys));
+                throw new ArgumentException("Argument must contain at least one separating key", nameof(firstKeys));
 
             for (int i = 1; i < firstKeys.Length; i++)
                 if (firstKeys[i].CompareTo(firstKeys[i - 1]) <= 0)
@@ -104,10 +104,10 @@ namespace Fwob
                     throw new FrameNotFoundException($"Fwob file {srcFile} is empty");
 
                 if (firstKeys.First().CompareTo(srcFile.FirstFrame.Key) < 0)
-                    throw new ArgumentException("First item in argument {0} beyonds file beginning", nameof(firstKeys));
+                    throw new ArgumentException("First item in argument beyonds file beginning", nameof(firstKeys));
 
                 if (firstKeys.Last().CompareTo(srcFile.LastFrame.Key) > 0)
-                    throw new ArgumentException("Last item in argument {0} beyonds file ending", nameof(firstKeys));
+                    throw new ArgumentException("Last item in argument beyonds file ending", nameof(firstKeys));
 
                 using (var br = new BinaryReader(srcFile.Stream, Encoding.UTF8, true))
                 {
@@ -159,11 +159,11 @@ namespace Fwob
                 throw new ArgumentNullException(nameof(srcPaths));
 
             if (srcPaths.Length == 0)
-                throw new ArgumentException("Argument {0} must contain at least one file path", nameof(srcPaths));
+                throw new ArgumentException("Argument must contain at least one file path", nameof(srcPaths));
 
             foreach (string path in srcPaths)
                 if (!File.Exists(path))
-                    throw new FileNotFoundException("File {0} not found", path);
+                    throw new FileNotFoundException("File not found", path);
 
             var fileList = new List<FwobFile<TFrame, TKey>>();
             try
