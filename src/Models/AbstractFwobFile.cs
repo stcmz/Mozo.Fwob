@@ -47,6 +47,10 @@ namespace Fwob.Models
 
         public abstract long AppendFramesTx(IEnumerable<TFrame> frames);
 
+        public abstract long DeleteFramesAfter(TKey firstKey);
+
+        public abstract long DeleteFramesBefore(TKey lastKey);
+
         public abstract void ClearFrames();
 
         #endregion

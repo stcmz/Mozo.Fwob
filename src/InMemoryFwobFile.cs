@@ -45,13 +45,14 @@ namespace Fwob
             return _frames[(int)index];
         }
 
-        int GetLowerBound(TKey key)
+        private int GetBound(TKey key, bool lower)
         {
             int lo, hi;
             for (lo = 0, hi = _frames.Count; lo < hi;)
             {
                 int mid = lo + (hi - lo >> 1);
-                if (_frames[mid].Key.CompareTo(key) < 0)
+                int cmp = _frames[mid].Key.CompareTo(key);
+                if (lower ? cmp < 0 : cmp <= 0)
                     lo = mid + 1;
                 else
                     hi = mid;
@@ -63,13 +64,13 @@ namespace Fwob
         {
             Debug.Assert(firstKey.CompareTo(lastKey) <= 0);
 
-            for (int i = GetLowerBound(firstKey); i < _frames.Count && _frames[i].Key.CompareTo(lastKey) <= 0; i++)
+            for (int i = GetBound(firstKey, true); i < _frames.Count && _frames[i].Key.CompareTo(lastKey) <= 0; i++)
                 yield return _frames[i];
         }
 
         public override IEnumerable<TFrame> GetFramesAfter(TKey firstKey)
         {
-            for (int i = GetLowerBound(firstKey); i < _frames.Count; i++)
+            for (int i = GetBound(firstKey, true); i < _frames.Count; i++)
                 yield return _frames[i];
         }
 
@@ -89,7 +90,7 @@ namespace Fwob
             foreach (var frame in frames)
             {
                 if (last != null && frame.Key.CompareTo(last.Key) < 0)
-                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                    throw new KeyOrderingException($"Frames should be in ascending order while appending.");
                 _frames.Add(frame);
                 last = frame;
                 count++;
@@ -108,13 +109,27 @@ namespace Fwob
             foreach (var frame in frames)
             {
                 if (last != null && frame.Key.CompareTo(last.Key) < 0)
-                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                    throw new KeyOrderingException($"Frames should be in ascending order while appending.");
                 last = frame;
                 count++;
             }
 
             _frames.AddRange(frames);
             return count;
+        }
+
+        public override long DeleteFramesAfter(TKey firstKey)
+        {
+            int lb = GetBound(firstKey, true), len = _frames.Count - lb;
+            _frames.RemoveRange(lb, len);
+            return len;
+        }
+
+        public override long DeleteFramesBefore(TKey lastKey)
+        {
+            int len = GetBound(lastKey, false);
+            _frames.RemoveRange(0, len);
+            return len;
         }
 
         public override void ClearFrames()

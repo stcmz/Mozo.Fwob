@@ -46,6 +46,8 @@ namespace Fwob
 
         private bool IsFileOpen => Stream != null && FilePath != null && Header != null;
 
+        private const int BlockCopyBufSize = 4 * 1024 * 1024;
+
         public static FwobFile<TFrame, TKey> CreateNewFile(string path, string title, FileMode mode = FileMode.CreateNew, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.Read)
         {
             if (title == null)
@@ -91,7 +93,7 @@ namespace Fwob
 
             for (int i = 1; i < firstKeys.Length; i++)
                 if (firstKeys[i].CompareTo(firstKeys[i - 1]) <= 0)
-                    throw new ArgumentException("Argument {0} must be in strictly ascending order", nameof(firstKeys));
+                    throw new KeyOrderingException($"Argument {nameof(firstKeys)} must be in strictly ascending order");
 
             if (!File.Exists(srcPath))
                 throw new FileNotFoundException("Fwob file not found", srcPath);
@@ -134,9 +136,8 @@ namespace Fwob
                             // clone frame data
                             br.BaseStream.Seek(dataPosition, SeekOrigin.Begin);
 
-                            int bufSize = 4 * 1024 * 1024;
-                            for (long k = dataLength; k > 0; k -= bufSize)
-                                bw.Write(br.ReadBytes((int)Math.Min(k, bufSize)));
+                            for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
+                                bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
 
                             // update frame count
                             bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
@@ -160,7 +161,7 @@ namespace Fwob
             if (srcPaths.Length == 0)
                 throw new ArgumentException("Argument {0} must contain at least one file path", nameof(srcPaths));
 
-            foreach (var path in srcPaths)
+            foreach (string path in srcPaths)
                 if (!File.Exists(path))
                     throw new FileNotFoundException("File {0} not found", path);
 
@@ -170,7 +171,7 @@ namespace Fwob
                 var strings = new List<string>();
                 FwobFile<TFrame, TKey> patFile = null;
 
-                foreach (var path in srcPaths)
+                foreach (string path in srcPaths)
                 {
                     var file = new FwobFile<TFrame, TKey>(path, FileAccess.Read, FileShare.Read);
                     var prevFile = fileList.LastOrDefault();
@@ -218,9 +219,8 @@ namespace Fwob
 
                             long dataLength = file.FrameCount * file.Header.FrameLength;
                             frameCount += file.FrameCount;
-                            int bufSize = 4 * 1024 * 1024;
-                            for (long k = dataLength; k > 0; k -= bufSize)
-                                bw.Write(br.ReadBytes((int)Math.Min(k, bufSize)));
+                            for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
+                                bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
                         }
                         file.Dispose();
                     }
@@ -554,7 +554,7 @@ namespace Fwob
                         _lastFrame = last;
                         Header.FrameCount += count;
                         bw.UpdateFrameCount(Header);
-                        throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                        throw new KeyOrderingException($"Frames should be in ascending order while appending.");
                     }
 
                     SerializeFrame(bw, it.Current);
@@ -584,7 +584,7 @@ namespace Fwob
             foreach (var frame in frames)
             {
                 if (last != null && frame.Key.CompareTo(last.Key) < 0)
-                    throw new InvalidDataException($"Frames should be in ascending order while appending.");
+                    throw new KeyOrderingException($"Frames should be in ascending order while appending.");
                 last = frame;
                 list.Add(frame);
             }
@@ -606,6 +606,89 @@ namespace Fwob
                 Header.FrameCount += list.Count;
                 bw.UpdateFrameCount(Header);
                 return list.Count;
+            }
+        }
+
+        public override long DeleteFramesAfter(TKey firstKey)
+        {
+            Debug.Assert(IsFileOpen);
+
+            if (Header.FrameCount == 0)
+                return 0;
+
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            {
+                long newFrameCount = GetBound(br, firstKey, true), deletedFrameCount = FrameCount - newFrameCount;
+
+                if (deletedFrameCount == 0)
+                    return 0;
+
+                if (newFrameCount == 0)
+                {
+                    _firstFrame = _lastFrame = null;
+                }
+                else
+                {
+                    br.BaseStream.Seek(Header.FirstFramePosition + (newFrameCount - 1) * Header.FrameLength, SeekOrigin.Begin);
+                    _lastFrame = DeserializeFrame(br);
+                }
+
+                bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
+                Header.FrameCount = newFrameCount;
+                bw.UpdateFrameCount(Header);
+
+                return deletedFrameCount;
+            }
+        }
+
+        public override long DeleteFramesBefore(TKey lastKey)
+        {
+            Debug.Assert(IsFileOpen);
+
+            if (Header.FrameCount == 0)
+                return 0;
+
+            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
+            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            {
+                long removedFrameCount = GetBound(br, lastKey, false), newFrameCount = FrameCount - removedFrameCount;
+
+                if (removedFrameCount == 0)
+                    return 0;
+
+                if (newFrameCount == 0)
+                {
+                    _firstFrame = _lastFrame = null;
+                }
+                else
+                {
+                    long totalBytes = newFrameCount * Header.FrameLength;
+                    long readerPos = Header.FirstFramePosition + removedFrameCount * Header.FrameLength;
+                    long writerPos = Header.FirstFramePosition;
+
+                    for (; totalBytes > 0; totalBytes -= BlockCopyBufSize)
+                    {
+                        // br and bw share the same stream, i.e., the BaseStream.Position must be set every read and write.
+                        br.BaseStream.Seek(readerPos, SeekOrigin.Begin);
+                        var buf = br.ReadBytes((int)Math.Min(totalBytes, BlockCopyBufSize));
+
+                        bw.BaseStream.Seek(writerPos, SeekOrigin.Begin);
+                        bw.Write(buf);
+
+                        readerPos += buf.Length;
+                        writerPos += buf.Length;
+                    }
+
+                    br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
+                    _firstFrame = DeserializeFrame(br);
+                }
+
+                bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
+                Header.FrameCount = newFrameCount;
+                bw.UpdateFrameCount(Header);
+
+                return removedFrameCount;
             }
         }
 
