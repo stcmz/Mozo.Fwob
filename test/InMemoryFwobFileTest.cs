@@ -297,7 +297,7 @@ namespace FwobUnitTest
             var tick2 = new Tick { Time = 13, Value = 44456.0111 };
             var tick3 = new Tick { Time = 100, Value = 1234.56 };
 
-            Assert.ThrowsException<InvalidDataException>(() => file.AppendFrames(tick, tick3, tick2));
+            Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick, tick3, tick2));
 
             // only two frames
             Assert.AreEqual(file.FirstFrame, tick);
@@ -334,7 +334,7 @@ namespace FwobUnitTest
             Assert.IsTrue(file.GetFramesBefore(100).Count() == 2);
             Assert.IsTrue(file.GetFramesBefore(101).Count() == 2);
 
-            Assert.ThrowsException<InvalidDataException>(() => file.AppendFrames(tick2));
+            Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick2));
             Assert.AreEqual(file.FirstFrame, tick);
             Assert.AreEqual(file.LastFrame, tick3);
             Assert.IsTrue(file.FrameCount == 2);
@@ -409,7 +409,7 @@ namespace FwobUnitTest
             var tick2 = new Tick { Time = 13, Value = 44456.0111 };
             var tick3 = new Tick { Time = 100, Value = 1234.56 };
 
-            Assert.ThrowsException<InvalidDataException>(() => file.AppendFramesTx(tick, tick3, tick2));
+            Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick, tick3, tick2));
 
             // no frame
             Assert.IsNull(file.FirstFrame);
@@ -426,9 +426,9 @@ namespace FwobUnitTest
             Assert.IsFalse(file.GetFramesBefore(0).Any());
 
             Assert.IsTrue(file.AppendFrames(tick) == 1);
-            Assert.ThrowsException<InvalidDataException>(() => file.AppendFramesTx(tick3, tick2));
+            Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3, tick2));
             Assert.IsTrue(file.AppendFrames(tick3) == 1);
-            Assert.ThrowsException<InvalidDataException>(() => file.AppendFramesTx(tick2));
+            Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick2));
 
             Assert.AreEqual(file.FirstFrame, tick);
             Assert.AreEqual(file.LastFrame, tick3);
@@ -493,6 +493,68 @@ namespace FwobUnitTest
             Assert.IsTrue(file.GetFramesBefore(12).Count() == 0);
             Assert.IsTrue(file.GetFramesBefore(13).Count() == 1);
             Assert.IsTrue(file.GetFramesBefore(14).Count() == 1);
+        }
+
+        [TestMethod]
+        public void TestFrameDeletion()
+        {
+            var file = new InMemoryFwobFile<Tick, int>("HelloFwob");
+            // adding the first
+            var tick = new Tick { Time = 12, Value = 99.88 };
+            var tick2 = new Tick { Time = 13, Value = 44456.0111 };
+            var tick3 = new Tick { Time = 14, Value = 44456.0111 };
+            var tick4 = new Tick { Time = 15, Value = 44456.0111 };
+            var tick5 = new Tick { Time = 100, Value = 1234.56 };
+
+            Assert.IsTrue(9 == file.AppendFrames(tick, tick, tick2, tick2, tick3, tick4, tick4, tick5, tick5));
+            Assert.IsTrue(file.FrameCount == 9);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(0 == file.DeleteFramesAfter(101));
+            Assert.IsTrue(file.FrameCount == 9);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(2 == file.DeleteFramesAfter(100));
+            Assert.IsTrue(file.FrameCount == 7);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick4);
+
+            Assert.IsTrue(5 == file.DeleteFramesAfter(13));
+            Assert.IsTrue(file.FrameCount == 2);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick);
+
+            Assert.IsTrue(2 == file.DeleteFramesAfter(0));
+            Assert.IsTrue(file.FrameCount == 0);
+            Assert.AreEqual(file.FirstFrame, null);
+            Assert.AreEqual(file.LastFrame, null);
+
+            Assert.IsTrue(9 == file.AppendFrames(tick, tick, tick2, tick2, tick3, tick4, tick4, tick5, tick5));
+            Assert.IsTrue(file.FrameCount == 9);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(0 == file.DeleteFramesBefore(11));
+            Assert.IsTrue(file.FrameCount == 9);
+            Assert.AreEqual(file.FirstFrame, tick);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(2 == file.DeleteFramesBefore(12));
+            Assert.IsTrue(file.FrameCount == 7);
+            Assert.AreEqual(file.FirstFrame, tick2);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(5 == file.DeleteFramesBefore(99));
+            Assert.IsTrue(file.FrameCount == 2);
+            Assert.AreEqual(file.FirstFrame, tick5);
+            Assert.AreEqual(file.LastFrame, tick5);
+
+            Assert.IsTrue(2 == file.DeleteFramesAfter(100));
+            Assert.IsTrue(file.FrameCount == 0);
+            Assert.AreEqual(file.FirstFrame, null);
+            Assert.AreEqual(file.LastFrame, null);
         }
     }
 }
