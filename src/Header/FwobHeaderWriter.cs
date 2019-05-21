@@ -97,7 +97,7 @@ namespace Fwob.Header
 
         public static void UpdateFrameCount(this BinaryWriter bw, FwobHeader header)
         {
-            bw.BaseStream.Seek(170, SeekOrigin.Begin);
+            bw.Seek(170, SeekOrigin.Begin);
 
             // pos 170: 8 bytes
             Debug.Assert(header.FrameCount >= 0);
@@ -106,7 +106,7 @@ namespace Fwob.Header
 
         public static void UpdateStringTableLength(this BinaryWriter bw, FwobHeader header)
         {
-            bw.BaseStream.Seek(158, SeekOrigin.Begin);
+            bw.Seek(158, SeekOrigin.Begin);
 
             // pos 158: 4 bytes
             Debug.Assert(header.StringCount >= 0);

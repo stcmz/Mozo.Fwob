@@ -543,7 +543,7 @@ namespace Fwob
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
-                bw.Seek((int)Header.LastFramePosition, SeekOrigin.Begin);
+                bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
 
                 var last = LastFrame;
                 long count = 0;
@@ -595,7 +595,7 @@ namespace Fwob
             using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
             {
                 Debug.Assert(bw.BaseStream.Length == Header.FileLength);
-                bw.Seek((int)Header.LastFramePosition, SeekOrigin.Begin);
+                bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
 
                 foreach (var frame in list)
                     SerializeFrame(bw, frame);
