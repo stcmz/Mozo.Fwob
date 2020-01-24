@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Fwob.Models
+﻿namespace Fwob.Models
 {
     public static class FwobLimits
     {

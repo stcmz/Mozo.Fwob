@@ -32,9 +32,11 @@ namespace Fwob
                     throw new ArgumentException(nameof(Title), "Argument can not be empty");
                 if (value.Length > FwobLimits.MaxTitleLength)
                     throw new ArgumentOutOfRangeException(nameof(Title), $"Length of argument exceeded {FwobLimits.MaxTitleLength}");
+
                 Header.Title = value;
-                using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
-                    bw.UpdateTitle(Header);
+
+                using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
+                bw.UpdateTitle(Header);
             }
         }
 
@@ -98,56 +100,53 @@ namespace Fwob
             if (!File.Exists(srcPath))
                 throw new FileNotFoundException("Fwob file not found", srcPath);
 
-            using (var srcFile = new FwobFile<TFrame, TKey>(srcPath, FileAccess.Read))
+            using var srcFile = new FwobFile<TFrame, TKey>(srcPath, FileAccess.Read);
+
+            if (srcFile.FrameCount == 0)
+                throw new FrameNotFoundException($"Fwob file {srcFile} is empty");
+
+            if (firstKeys.First().CompareTo(srcFile.FirstFrame.Key) < 0)
+                throw new ArgumentException("First item in argument beyonds file beginning", nameof(firstKeys));
+
+            if (firstKeys.Last().CompareTo(srcFile.LastFrame.Key) > 0)
+                throw new ArgumentException("Last item in argument beyonds file ending", nameof(firstKeys));
+
+            using var br = new BinaryReader(srcFile.Stream, Encoding.UTF8, true);
+
+            long[] firstIndices = new[] { 0L }
+                .Concat(firstKeys.Select(key => srcFile.GetBound(br, key, true)))
+                .Concat(new[] { srcFile.FrameCount })
+                .ToArray();
+
+            long framesWritten = 0;
+
+            for (int i = 0; i < firstIndices.Length - 1; i++)
             {
-                if (srcFile.FrameCount == 0)
-                    throw new FrameNotFoundException($"Fwob file {srcFile} is empty");
+                string dstPath = Path.ChangeExtension(srcPath, $".part{i}.fwob");
 
-                if (firstKeys.First().CompareTo(srcFile.FirstFrame.Key) < 0)
-                    throw new ArgumentException("First item in argument beyonds file beginning", nameof(firstKeys));
+                long frameCount = firstIndices[i + 1] - firstIndices[i];
+                long dataPosition = srcFile.Header.FirstFramePosition + firstIndices[i] * srcFile.Header.FrameLength;
+                long dataLength = frameCount * srcFile.Header.FrameLength;
 
-                if (firstKeys.Last().CompareTo(srcFile.LastFrame.Key) > 0)
-                    throw new ArgumentException("Last item in argument beyonds file ending", nameof(firstKeys));
+                using var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                using var bw = new BinaryWriter(stream);
 
-                using (var br = new BinaryReader(srcFile.Stream, Encoding.UTF8, true))
-                {
-                    long[] firstIndices = new[] { 0L }
-                        .Concat(firstKeys.Select(key => srcFile.GetBound(br, key, true)))
-                        .Concat(new[] { srcFile.FrameCount })
-                        .ToArray();
+                // clone header and string table
+                br.BaseStream.Seek(0, SeekOrigin.Begin);
+                bw.Write(br.ReadBytes((int)srcFile.Header.FirstFramePosition));
 
-                    long framesWritten = 0;
+                // clone frame data
+                br.BaseStream.Seek(dataPosition, SeekOrigin.Begin);
 
-                    for (int i = 0; i < firstIndices.Length - 1; i++)
-                    {
-                        string dstPath = Path.ChangeExtension(srcPath, $".part{i}.fwob");
+                for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
+                    bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
 
-                        long frameCount = firstIndices[i + 1] - firstIndices[i];
-                        long dataPosition = srcFile.Header.FirstFramePosition + firstIndices[i] * srcFile.Header.FrameLength;
-                        long dataLength = frameCount * srcFile.Header.FrameLength;
-
-                        using (var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                        using (var bw = new BinaryWriter(stream))
-                        {
-                            // clone header and string table
-                            br.BaseStream.Seek(0, SeekOrigin.Begin);
-                            bw.Write(br.ReadBytes((int)srcFile.Header.FirstFramePosition));
-
-                            // clone frame data
-                            br.BaseStream.Seek(dataPosition, SeekOrigin.Begin);
-
-                            for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
-                                bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
-
-                            // update frame count
-                            bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
-                            framesWritten += frameCount;
-                        }
-                    }
-
-                    Debug.Assert(framesWritten == srcFile.FrameCount, $"Frames written inconsistent: {framesWritten} != {srcFile.FrameCount}");
-                }
+                // update frame count
+                bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
+                framesWritten += frameCount;
             }
+
+            Debug.Assert(framesWritten == srcFile.FrameCount, $"Frames written inconsistent: {framesWritten} != {srcFile.FrameCount}");
         }
 
         public static void Concat(string dstPath, params string[] srcPaths)
@@ -199,35 +198,34 @@ namespace Fwob
                     file.UnloadStringTable();
                 }
 
-                using (var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                using (var bw = new BinaryWriter(stream))
+                using var stream = new FileStream(dstPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                using var bw = new BinaryWriter(stream);
+
+                // clone header and string table from pattern file
+                using (var br = new BinaryReader(patFile.Stream, Encoding.UTF8, true))
                 {
-                    // clone header and string table from pattern file
-                    using (var br = new BinaryReader(patFile.Stream, Encoding.UTF8, true))
-                    {
-                        br.BaseStream.Seek(0, SeekOrigin.Begin);
-                        bw.Write(br.ReadBytes((int)patFile.Header.FirstFramePosition));
-                    }
-
-                    // clone frame data from each source
-                    long frameCount = 0;
-                    foreach (var file in fileList)
-                    {
-                        using (var br = new BinaryReader(file.Stream))
-                        {
-                            br.BaseStream.Seek(file.Header.FirstFramePosition, SeekOrigin.Begin);
-
-                            long dataLength = file.FrameCount * file.Header.FrameLength;
-                            frameCount += file.FrameCount;
-                            for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
-                                bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
-                        }
-                        file.Dispose();
-                    }
-
-                    // update frame count
-                    bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
+                    br.BaseStream.Seek(0, SeekOrigin.Begin);
+                    bw.Write(br.ReadBytes((int)patFile.Header.FirstFramePosition));
                 }
+
+                // clone frame data from each source
+                long frameCount = 0;
+                foreach (var file in fileList)
+                {
+                    using (var br = new BinaryReader(file.Stream))
+                    {
+                        br.BaseStream.Seek(file.Header.FirstFramePosition, SeekOrigin.Begin);
+
+                        long dataLength = file.FrameCount * file.Header.FrameLength;
+                        frameCount += file.FrameCount;
+                        for (long k = dataLength; k > 0; k -= BlockCopyBufSize)
+                            bw.Write(br.ReadBytes((int)Math.Min(k, BlockCopyBufSize)));
+                    }
+                    file.Dispose();
+                }
+
+                // update frame count
+                bw.UpdateFrameCount(new FwobHeader { FrameCount = frameCount });
             }
             catch (Exception)
             {
@@ -247,26 +245,25 @@ namespace Fwob
             FilePath = path;
             Stream = new FileStream(path, FileMode.Open, fileAccess, fileShare);
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
+
+            Header = br.ReadHeader();
+
+            if (Header == null)
+                throw new InvalidDataException($"Input file {path} is not in a FWOB format.");
+
+            FrameInfo = Header.GetFrameInfo<TFrame>();
+
+            if (FrameInfo == null)
+                throw new InvalidDataException($"Input file {path} does not match frame type {typeof(TFrame)}.");
+
+            if (Header.FileLength != br.BaseStream.Length)
+                throw new InvalidDataException($"Input file {path} length verification failed.");
+
+            if (FrameCount > 0)
             {
-                Header = br.ReadHeader();
-
-                if (Header == null)
-                    throw new InvalidDataException($"Input file {path} is not in a FWOB format.");
-
-                FrameInfo = Header.GetFrameInfo<TFrame>();
-
-                if (FrameInfo == null)
-                    throw new InvalidDataException($"Input file {path} does not match frame type {typeof(TFrame)}.");
-
-                if (Header.FileLength != br.BaseStream.Length)
-                    throw new InvalidDataException($"Input file {path} length verification failed.");
-
-                if (FrameCount > 0)
-                {
-                    _firstFrame = GetFrame(0);
-                    _lastFrame = GetFrame(FrameCount - 1);
-                }
+                _firstFrame = GetFrame(0);
+                _lastFrame = GetFrame(FrameCount - 1);
             }
         }
 
@@ -315,13 +312,12 @@ namespace Fwob
             if (index < 0 || index >= Header.FrameCount)
                 return null;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            {
-                Debug.Assert(br.BaseStream.Length == Header.FileLength);
-                br.BaseStream.Seek(Header.FirstFramePosition + index * Header.FrameLength, SeekOrigin.Begin);
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
 
-                return DeserializeFrame(br);
-            }
+            Debug.Assert(br.BaseStream.Length == Header.FileLength);
+            br.BaseStream.Seek(Header.FirstFramePosition + index * Header.FrameLength, SeekOrigin.Begin);
+
+            return DeserializeFrame(br);
         }
 
         private long GetBound(BinaryReader br, TKey key, bool lower)
@@ -474,20 +470,19 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
+
+            long p = GetBound(br, firstKey, true);
+            br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
+
+            for (; p < Header.FrameCount; p++)
             {
-                long p = GetBound(br, firstKey, true);
-                br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
+                var frame = DeserializeFrame(br);
 
-                for (; p < Header.FrameCount; p++)
-                {
-                    var frame = DeserializeFrame(br);
+                if (frame.Key.CompareTo(lastKey) > 0)
+                    yield break;
 
-                    if (frame.Key.CompareTo(lastKey) > 0)
-                        yield break;
-
-                    yield return frame;
-                }
+                yield return frame;
             }
         }
 
@@ -498,15 +493,14 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            {
-                long p = GetBound(br, firstKey, true);
-                br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
 
-                for (; p < Header.FrameCount; p++)
-                {
-                    yield return DeserializeFrame(br);
-                }
+            long p = GetBound(br, firstKey, true);
+            br.BaseStream.Seek(Header.FirstFramePosition + p * Header.FrameLength, SeekOrigin.Begin);
+
+            for (; p < Header.FrameCount; p++)
+            {
+                yield return DeserializeFrame(br);
             }
         }
 
@@ -517,15 +511,14 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 yield break;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            {
-                long p = GetBound(br, lastKey, false);
-                br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
 
-                for (; p > 0; p--)
-                {
-                    yield return DeserializeFrame(br);
-                }
+            long p = GetBound(br, lastKey, false);
+            br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
+
+            for (; p > 0; p--)
+            {
+                yield return DeserializeFrame(br);
             }
         }
 
@@ -540,36 +533,36 @@ namespace Fwob
             if (!it.MoveNext())
                 return 0;
 
-            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
+
+            Debug.Assert(bw.BaseStream.Length == Header.FileLength);
+            bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
+
+            var last = LastFrame;
+            long count = 0;
+            do
             {
-                Debug.Assert(bw.BaseStream.Length == Header.FileLength);
-                bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
-
-                var last = LastFrame;
-                long count = 0;
-                do
+                if (last != null && it.Current.Key.CompareTo(last.Key) < 0)
                 {
-                    if (last != null && it.Current.Key.CompareTo(last.Key) < 0)
-                    {
-                        _lastFrame = last;
-                        Header.FrameCount += count;
-                        bw.UpdateFrameCount(Header);
-                        throw new KeyOrderingException($"Frames should be in ascending order while appending.");
-                    }
-
-                    SerializeFrame(bw, it.Current);
-                    last = it.Current;
-                    if (_firstFrame == null)
-                        _firstFrame = last;
-                    count++;
+                    _lastFrame = last;
+                    Header.FrameCount += count;
+                    bw.UpdateFrameCount(Header);
+                    throw new KeyOrderingException($"Frames should be in ascending order while appending.");
                 }
-                while (it.MoveNext());
 
-                _lastFrame = last;
-                Header.FrameCount += count;
-                bw.UpdateFrameCount(Header);
-                return count;
+                SerializeFrame(bw, it.Current);
+                last = it.Current;
+                if (_firstFrame == null)
+                    _firstFrame = last;
+                count++;
             }
+            while (it.MoveNext());
+
+            _lastFrame = last;
+            Header.FrameCount += count;
+            bw.UpdateFrameCount(Header);
+
+            return count;
         }
 
         public override long AppendFramesTx(IEnumerable<TFrame> frames)
@@ -592,21 +585,22 @@ namespace Fwob
             if (list.Count == 0)
                 return 0;
 
-            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
-            {
-                Debug.Assert(bw.BaseStream.Length == Header.FileLength);
-                bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
+            using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
 
-                foreach (var frame in list)
-                    SerializeFrame(bw, frame);
+            Debug.Assert(bw.BaseStream.Length == Header.FileLength);
+            bw.BaseStream.Seek(Header.LastFramePosition, SeekOrigin.Begin);
 
-                if (_firstFrame == null)
-                    _firstFrame = list[0];
-                _lastFrame = last;
-                Header.FrameCount += list.Count;
-                bw.UpdateFrameCount(Header);
-                return list.Count;
-            }
+            foreach (var frame in list)
+                SerializeFrame(bw, frame);
+
+            if (_firstFrame == null)
+                _firstFrame = list[0];
+
+            _lastFrame = last;
+            Header.FrameCount += list.Count;
+            bw.UpdateFrameCount(Header);
+
+            return list.Count;
         }
 
         public override long DeleteFramesAfter(TKey firstKey)
@@ -616,30 +610,29 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 return 0;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
+            using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
+
+            long newFrameCount = GetBound(br, firstKey, true), deletedFrameCount = FrameCount - newFrameCount;
+
+            if (deletedFrameCount == 0)
+                return 0;
+
+            if (newFrameCount == 0)
             {
-                long newFrameCount = GetBound(br, firstKey, true), deletedFrameCount = FrameCount - newFrameCount;
-
-                if (deletedFrameCount == 0)
-                    return 0;
-
-                if (newFrameCount == 0)
-                {
-                    _firstFrame = _lastFrame = null;
-                }
-                else
-                {
-                    br.BaseStream.Seek(Header.FirstFramePosition + (newFrameCount - 1) * Header.FrameLength, SeekOrigin.Begin);
-                    _lastFrame = DeserializeFrame(br);
-                }
-
-                bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
-                Header.FrameCount = newFrameCount;
-                bw.UpdateFrameCount(Header);
-
-                return deletedFrameCount;
+                _firstFrame = _lastFrame = null;
             }
+            else
+            {
+                br.BaseStream.Seek(Header.FirstFramePosition + (newFrameCount - 1) * Header.FrameLength, SeekOrigin.Begin);
+                _lastFrame = DeserializeFrame(br);
+            }
+
+            bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
+            Header.FrameCount = newFrameCount;
+            bw.UpdateFrameCount(Header);
+
+            return deletedFrameCount;
         }
 
         public override long DeleteFramesBefore(TKey lastKey)
@@ -649,47 +642,46 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 return 0;
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
+            using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
+
+            long removedFrameCount = GetBound(br, lastKey, false), newFrameCount = FrameCount - removedFrameCount;
+
+            if (removedFrameCount == 0)
+                return 0;
+
+            if (newFrameCount == 0)
             {
-                long removedFrameCount = GetBound(br, lastKey, false), newFrameCount = FrameCount - removedFrameCount;
-
-                if (removedFrameCount == 0)
-                    return 0;
-
-                if (newFrameCount == 0)
-                {
-                    _firstFrame = _lastFrame = null;
-                }
-                else
-                {
-                    long totalBytes = newFrameCount * Header.FrameLength;
-                    long readerPos = Header.FirstFramePosition + removedFrameCount * Header.FrameLength;
-                    long writerPos = Header.FirstFramePosition;
-
-                    for (; totalBytes > 0; totalBytes -= BlockCopyBufSize)
-                    {
-                        // br and bw share the same stream, i.e., the BaseStream.Position must be set every read and write.
-                        br.BaseStream.Seek(readerPos, SeekOrigin.Begin);
-                        var buf = br.ReadBytes((int)Math.Min(totalBytes, BlockCopyBufSize));
-
-                        bw.BaseStream.Seek(writerPos, SeekOrigin.Begin);
-                        bw.Write(buf);
-
-                        readerPos += buf.Length;
-                        writerPos += buf.Length;
-                    }
-
-                    br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
-                    _firstFrame = DeserializeFrame(br);
-                }
-
-                bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
-                Header.FrameCount = newFrameCount;
-                bw.UpdateFrameCount(Header);
-
-                return removedFrameCount;
+                _firstFrame = _lastFrame = null;
             }
+            else
+            {
+                long totalBytes = newFrameCount * Header.FrameLength;
+                long readerPos = Header.FirstFramePosition + removedFrameCount * Header.FrameLength;
+                long writerPos = Header.FirstFramePosition;
+
+                for (; totalBytes > 0; totalBytes -= BlockCopyBufSize)
+                {
+                    // br and bw share the same stream, i.e., the BaseStream.Position must be set every read and write.
+                    br.BaseStream.Seek(readerPos, SeekOrigin.Begin);
+                    byte[] buf = br.ReadBytes((int)Math.Min(totalBytes, BlockCopyBufSize));
+
+                    bw.BaseStream.Seek(writerPos, SeekOrigin.Begin);
+                    bw.Write(buf);
+
+                    readerPos += buf.Length;
+                    writerPos += buf.Length;
+                }
+
+                br.BaseStream.Seek(Header.FirstFramePosition, SeekOrigin.Begin);
+                _firstFrame = DeserializeFrame(br);
+            }
+
+            bw.BaseStream.SetLength(Header.FirstFramePosition + newFrameCount * Header.FrameLength);
+            Header.FrameCount = newFrameCount;
+            bw.UpdateFrameCount(Header);
+
+            return removedFrameCount;
         }
 
         public override void ClearFrames()
@@ -699,15 +691,14 @@ namespace Fwob
             if (Header.FrameCount == 0)
                 return;
 
-            using (var bw = new BinaryWriter(Stream, Encoding.UTF8, true))
-            {
-                Debug.Assert(bw.BaseStream.Length > Header.FirstFramePosition);
-                bw.BaseStream.SetLength(Header.FirstFramePosition);
+            using var bw = new BinaryWriter(Stream, Encoding.UTF8, true);
 
-                _firstFrame = _lastFrame = null;
-                Header.FrameCount = 0;
-                bw.UpdateFrameCount(Header);
-            }
+            Debug.Assert(bw.BaseStream.Length > Header.FirstFramePosition);
+            bw.BaseStream.SetLength(Header.FirstFramePosition);
+
+            _firstFrame = _lastFrame = null;
+            Header.FrameCount = 0;
+            bw.UpdateFrameCount(Header);
         }
 
         #endregion
@@ -726,27 +717,26 @@ namespace Fwob
 
             Debug.Assert(IsFileOpen);
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
+
+            Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
+            br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+
+            var list = new List<string>();
+            var dict = new Dictionary<string, int>();
+
+            for (int i = 0; i < Header.StringCount; i++)
             {
-                Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
-                br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
-
-                var list = new List<string>();
-                var dict = new Dictionary<string, int>();
-
-                for (int i = 0; i < Header.StringCount; i++)
-                {
-                    string str = br.ReadString();
-                    dict[str] = list.Count;
-                    list.Add(str);
-                }
-
-                if (br.BaseStream.Position != Header.StringTableEnding)
-                    throw new Exception("String table length inconsistent with header");
-
-                _strings = list;
-                _stringDict = dict;
+                string str = br.ReadString();
+                dict[str] = list.Count;
+                list.Add(str);
             }
+
+            if (br.BaseStream.Position != Header.StringTableEnding)
+                throw new Exception("String table length inconsistent with header");
+
+            _strings = list;
+            _stringDict = dict;
         }
 
         public void UnloadStringTable()
@@ -777,14 +767,13 @@ namespace Fwob
         {
             Debug.Assert(IsFileOpen);
 
-            using (var br = new BinaryReader(Stream, Encoding.UTF8, true))
-            {
-                Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
-                br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+            using var br = new BinaryReader(Stream, Encoding.UTF8, true);
 
-                for (int i = 0; i < Header.StringCount; i++)
-                    yield return (i, br.ReadString());
-            }
+            Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
+            br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+
+            for (int i = 0; i < Header.StringCount; i++)
+                yield return (i, br.ReadString());
         }
 
         public override string GetString(int index)
@@ -869,7 +858,7 @@ namespace Fwob
             if (IsStringsLoaded)
                 return _stringDict.ContainsKey(str);
 
-            foreach (var (idx, s) in LookupStringInFile())
+            foreach (var (_, s) in LookupStringInFile())
                 if (s == str)
                     return true;
 

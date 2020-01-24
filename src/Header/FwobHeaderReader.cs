@@ -15,7 +15,7 @@ namespace Fwob.Header
             //*********************** Signature and Version (5 bytes) ************************//
 
             // pos 0: 4 bytes
-            var sig = new string(br.ReadChars(4));
+            string sig = new string(br.ReadChars(4));
             if (sig != FwobHeader.Signature)
                 return null;
 
