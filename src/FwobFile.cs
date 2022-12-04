@@ -258,7 +258,7 @@ namespace Fwob
                 throw new InvalidDataException($"Input file {path} does not match frame type {typeof(TFrame)}.");
 
             if (Header.FileLength != br.BaseStream.Length)
-                throw new InvalidDataException($"Input file {path} length verification failed.");
+                throw new InvalidDataException($"Input file {path} length verification failed, header: {Header.FileLength} actual: {br.BaseStream.Length}.");
 
             if (FrameCount > 0)
             {
