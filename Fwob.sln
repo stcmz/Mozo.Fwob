@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33122.133
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Fwob", "src\Fwob.csproj", "{652DB6C9-91E0-45F0-AB56-AB971F91603F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FwobUnitTest", "test\FwobUnitTest.csproj", "{DE16AE54-C154-4DE4-B031-D213859E4D84}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{652DB6C9-91E0-45F0-AB56-AB971F91603F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{652DB6C9-91E0-45F0-AB56-AB971F91603F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{652DB6C9-91E0-45F0-AB56-AB971F91603F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{652DB6C9-91E0-45F0-AB56-AB971F91603F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E9CEC46B-D9BD-4D13-A17D-C5FA25AC1A34}
+	EndGlobalSection
+EndGlobal
