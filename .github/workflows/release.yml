@@ -18,6 +18,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 7.0.x
+        source-url: https://nuget.pkg.github.com/stcmz/index.json
+      env:
+        NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     - name: Restore dependencies
       run: dotnet restore
@@ -35,9 +38,7 @@ jobs:
       run: dotnet pack -c Release
 
     - name: Push the package to GPR
-      run: dotnet nuget push src/bin/Release/*.nupkg -k $NUGET_AUTH_TOKEN -s https://nuget.pkg.github.com/stcmz/index.json
-      env:
-        NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: dotnet nuget push src/bin/Release/*.nupkg
 
     - name: Push the package to nuget.org
       run: dotnet nuget push src/bin/Release/*.nupkg -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
