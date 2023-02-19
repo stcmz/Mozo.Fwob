@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\/v/}
+
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -18,9 +22,6 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 7.0.x
-        source-url: https://nuget.pkg.github.com/stcmz/index.json
-      env:
-        NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     - name: Restore dependencies
       run: dotnet restore
@@ -38,10 +39,12 @@ jobs:
       run: dotnet pack -c Release
 
     - name: Push the package to GPR
-      run: dotnet nuget push src/bin/Release/*.nupkg
+      run: dotnet nuget push src/bin/Release/*.nupkg --skip-duplicate -k $NUGET_AUTH_TOKEN -s https://nuget.pkg.github.com/stcmz/index.json
+      env:
+        NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Push the package to nuget.org
-      run: dotnet nuget push src/bin/Release/*.nupkg -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
+      run: dotnet nuget push src/bin/Release/*.nupkg --skip-duplicate -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
       env:
         NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TOKEN }}
 
@@ -56,7 +59,7 @@ jobs:
         body: |
           ## Release Note
 
-          Please refer to the commit messages for what's new in this release. This library is also available on Github Package Registry (GPR) and NuGet(https://www.nuget.org/packages/Mozo.Fwob/${{ github.ref }}).
+          Please refer to the commit messages for what's new in this release. This library is also available on [Github Package Registry (GPR)](https://github.com/stcmz/Mozo.Fwob/pkgs/nuget/Mozo.Fwob) and NuGet(https://www.nuget.org/packages/Mozo.Fwob/${{ steps.get_version.outputs.version }}).
 
           ### Prerequisite
 
