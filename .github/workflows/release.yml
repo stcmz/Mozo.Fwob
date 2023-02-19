@@ -59,7 +59,7 @@ jobs:
         body: |
           ## Release Note
 
-          Please refer to the commit messages for what's new in this release. This library is also available on [Github Package Registry (GPR)](https://github.com/stcmz/Mozo.Fwob/pkgs/nuget/Mozo.Fwob) and NuGet(https://www.nuget.org/packages/Mozo.Fwob/${{ steps.get_version.outputs.version }}).
+          Please refer to the commit messages for what's new in this release. This library is also available on [Github Package Registry (GPR)](https://github.com/stcmz/Mozo.Fwob/pkgs/nuget/Mozo.Fwob) and [NuGet](https://www.nuget.org/packages/Mozo.Fwob/${{ steps.get_version.outputs.version }}).
 
           ### Prerequisite
 
