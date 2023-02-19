@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace Fwob
+namespace Mozo.Fwob;
+
+[Serializable]
+public class StringTableException : Exception
 {
-    [Serializable]
-    public class StringTableException : Exception
-    {
-        public StringTableException() { }
-        public StringTableException(string message) : base(message) { }
-        public StringTableException(string message, Exception inner) : base(message, inner) { }
-        protected StringTableException(
-          SerializationInfo info,
-          StreamingContext context) : base(info, context) { }
-    }
+    public StringTableException() { }
+    public StringTableException(string message) : base(message) { }
+    public StringTableException(string message, Exception inner) : base(message, inner) { }
+    protected StringTableException(
+      SerializationInfo info,
+      StreamingContext context) : base(info, context) { }
 }

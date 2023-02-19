@@ -1,21 +1,20 @@
 ﻿using System.Collections.Generic;
 
-namespace Fwob.Models
+namespace Mozo.Fwob.Models;
+
+public interface IStringTable
 {
-    public interface IStringTable
-    {
-        IReadOnlyList<string> Strings { get; }
+    IReadOnlyList<string>? Strings { get; }
 
-        int StringCount { get; }
+    int StringCount { get; }
 
-        string GetString(int index);
+    string? GetString(int index);
 
-        int GetIndex(string str);
+    int GetIndex(string str);
 
-        int AppendString(string str);
+    int AppendString(string str);
 
-        bool ContainsString(string str);
+    bool ContainsString(string str);
 
-        void ClearStrings();
-    }
+    void ClearStrings();
 }

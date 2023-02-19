@@ -1,15 +1,14 @@
-﻿namespace Fwob.Models
+﻿namespace Mozo.Fwob.Models;
+
+public enum FieldType
 {
-    public enum FieldType
-    {
-        SignedInteger,
+    SignedInteger,
 
-        UnsignedInteger,
+    UnsignedInteger,
 
-        FloatingPoint,
+    FloatingPoint,
 
-        Utf8String,
+    Utf8String,
 
-        StringTableIndex,
-    }
+    StringTableIndex,
 }

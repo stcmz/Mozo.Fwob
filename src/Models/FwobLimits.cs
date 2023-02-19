@@ -1,4 +1,4 @@
-﻿namespace Fwob.Models
+﻿namespace Mozo.Fwob.Models
 {
     public static class FwobLimits
     {
