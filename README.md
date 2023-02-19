@@ -1,5 +1,9 @@
 # Fixed-Width Ordered Binary (FWOB) Format Library
 
+[![NuGet version (Mozo.Fwob)](https://img.shields.io/nuget/v/Mozo.Fwob.svg)](https://www.nuget.org/packages/Mozo.Fwob/)
+![Build workflow](https://github.com/stcmz/Mozo.Fwob/actions/workflows/build.yml/badge.svg)
+![Release workflow](https://github.com/stcmz/Mozo.Fwob/actions/workflows/release.yml/badge.svg)
+
 This repository contains the library implementation of the FWOB file format.
 
 ## Features
@@ -11,6 +15,25 @@ This repository contains the library implementation of the FWOB file format.
 * High-efficient (de)serializer (40% performance vs the best C++ implementation)
 * Built-in support for a string table
 * Supports on-disk file and in-memory storage
+
+## Build from source
+
+```bash
+# Restore any necessary imported packages
+dotnet restore
+
+# Build the entire solution
+dotnet build --no-restore
+
+# Run the test cases in the test directory
+dotnet test --no-build --verbosity normal
+
+# Publish a portable .dll for any supported system that have the .NET Runtime/SDK installed
+dotnet publish -c Release --no-self-contained
+
+# Pack the built manifests into a .nupkg package
+dotnet pack -c Release
+```
 
 ## How to Use
 
