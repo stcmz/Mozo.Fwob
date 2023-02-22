@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mozo.Fwob", "src\Mozo.Fwob.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mozo.Fwob.UnitTest", "test\Mozo.Fwob.UnitTest.csproj", "{DE16AE54-C154-4DE4-B031-D213859E4D84}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mozo.Fwob.Generators", "codegen\Mozo.Fwob.Generators.csproj", "{71D508F3-35DD-4E74-9827-F25501CFCA01}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE16AE54-C154-4DE4-B031-D213859E4D84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71D508F3-35DD-4E74-9827-F25501CFCA01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71D508F3-35DD-4E74-9827-F25501CFCA01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71D508F3-35DD-4E74-9827-F25501CFCA01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71D508F3-35DD-4E74-9827-F25501CFCA01}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
