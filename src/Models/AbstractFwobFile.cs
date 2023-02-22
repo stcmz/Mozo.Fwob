@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Mozo.Fwob.Frame;
+using System;
 using System.Collections.Generic;
 
 namespace Mozo.Fwob.Models;
@@ -13,6 +14,8 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, T
     public abstract string Title { get; set; }
 
     public TFrame? this[long index] => GetFrame(index);
+
+    protected static readonly Func<TFrame, TKey> GetKey = FwobFrameReaderGenerator<TFrame, TKey>.GenerateKeyGetter();
 
     #region Abstract implementations of IFrameQueryable<TFrame, TKey>
 

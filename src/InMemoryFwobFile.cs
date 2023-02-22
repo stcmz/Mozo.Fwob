@@ -1,4 +1,5 @@
-﻿using Mozo.Fwob.Models;
+﻿using Mozo.Fwob.Exceptions;
+using Mozo.Fwob.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,8 +18,10 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(Title));
+            if (value.Length == 0)
+                throw new ArgumentException("Argument can not be empty", nameof(Title));
             if (value.Length > FwobLimits.MaxTitleLength)
-                throw new ArgumentException(nameof(Title), $"Length of argument exceeded {FwobLimits.MaxTitleLength}");
+                throw new TitleTooLongException(value, value.Length);
             _title = value;
         }
     }
@@ -28,7 +31,7 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
     public InMemoryFwobFile(string title)
     {
         _title = title;
-        FrameInfo = FrameInfo.FromSystem(typeof(TFrame));
+        FrameInfo = FrameInfo.FromSystem(typeof(TFrame), typeof(TKey));
     }
 
     #region Implementations of IFrameQueryable
@@ -50,7 +53,7 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
         for (lo = 0, hi = _frames.Count; lo < hi;)
         {
             int mid = lo + (hi - lo >> 1);
-            int cmp = _frames[mid].Key.CompareTo(key);
+            int cmp = GetKey(_frames[mid]).CompareTo(key);
             if (lower ? cmp < 0 : cmp <= 0)
                 lo = mid + 1;
             else
@@ -63,7 +66,7 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
     {
         Debug.Assert(firstKey.CompareTo(lastKey) <= 0);
 
-        for (int i = GetBound(firstKey, true); i < _frames.Count && _frames[i].Key.CompareTo(lastKey) <= 0; i++)
+        for (int i = GetBound(firstKey, true); i < _frames.Count && GetKey(_frames[i]).CompareTo(lastKey) <= 0; i++)
             yield return _frames[i];
     }
 
@@ -75,7 +78,7 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
 
     public override IEnumerable<TFrame> GetFramesBefore(TKey lastKey)
     {
-        for (int i = 0; i < _frames.Count && _frames[i].Key.CompareTo(lastKey) <= 0; i++)
+        for (int i = 0; i < _frames.Count && GetKey(_frames[i]).CompareTo(lastKey) <= 0; i++)
             yield return _frames[i];
     }
 
@@ -84,12 +87,12 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
         if (frames == null)
             throw new ArgumentNullException(nameof(frames));
 
-        var last = _frames.LastOrDefault();
+        TFrame? last = _frames.LastOrDefault();
         long count = 0;
-        foreach (var frame in frames)
+        foreach (TFrame frame in frames)
         {
-            if (last != null && frame.Key.CompareTo(last.Key) < 0)
-                throw new KeyOrderingException($"Frames should be in ascending order while appending.");
+            if (last != null && GetKey(frame).CompareTo(GetKey(last)) < 0)
+                throw new KeyOrderViolationException();
             _frames.Add(frame);
             last = frame;
             count++;
@@ -103,12 +106,12 @@ public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
         if (frames == null)
             throw new ArgumentNullException(nameof(frames));
 
-        var last = _frames.LastOrDefault();
+        TFrame? last = _frames.LastOrDefault();
         long count = 0;
-        foreach (var frame in frames)
+        foreach (TFrame frame in frames)
         {
-            if (last != null && frame.Key.CompareTo(last.Key) < 0)
-                throw new KeyOrderingException($"Frames should be in ascending order while appending.");
+            if (last != null && GetKey(frame).CompareTo(GetKey(last)) < 0)
+                throw new KeyOrderViolationException();
             last = frame;
             count++;
         }

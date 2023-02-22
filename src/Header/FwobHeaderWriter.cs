@@ -26,7 +26,6 @@ public static class FwobHeaderWriter
         bw.Write(header.FieldCount);
 
         // pos 6: 16 bytes (allow up to 16 fields)
-        Debug.Assert(header.FieldLengths != null);
         Debug.Assert(header.FieldLengths.Length == header.FieldCount);
         bw.Write(header.FieldLengths);
 
@@ -37,7 +36,6 @@ public static class FwobHeaderWriter
         bw.Write(header.FieldTypes);
 
         // pos 30: 128 bytes (allow up to 16*8 chars)
-        Debug.Assert(header.FieldNames != null);
         Debug.Assert(header.FieldNames.Length == header.FieldCount);
 
         for (int i = 0; i < header.FieldCount; i++)

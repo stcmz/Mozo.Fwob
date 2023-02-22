@@ -1,32 +1,51 @@
-﻿using System.Diagnostics;
-using System.Linq;
+﻿using Mozo.Fwob.Exceptions;
+using System;
+using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace Mozo.Fwob.Models;
 
 public class FieldInfo
 {
+    public bool IsKey { get; internal set; }
+
     public int FieldLength { get; private set; }
 
     public FieldType FieldType { get; private set; }
 
     public string FieldName { get; private set; } = string.Empty;
 
-    public static FieldInfo FromSystem(System.Reflection.FieldInfo field)
+    public static FieldInfo? FromSystem(System.Reflection.FieldInfo field)
     {
         // Use assertions to detect develop time issues (bugs), while use exceptions to detect runtime issues (external errors).
-        var fieldInfo = new FieldInfo();
+        FieldInfo fieldInfo = new();
 
-        Debug.Assert(field.Name.Length <= FwobLimits.MaxFieldNameLength);
+        if (field.Name.Length > FwobLimits.MaxFieldNameLength)
+            throw new FieldNameTooLongException(field.Name, field.Name.Length);
+
         fieldInfo.FieldName = field.Name;
 
-        var type = field.FieldType;
-        bool isIndex = field.GetCustomAttributes(typeof(StringTableIndexAttribute), false).Length > 0;
-        var lengthAttr = field.GetCustomAttributes(typeof(LengthAttribute), false).Cast<LengthAttribute>().FirstOrDefault();
+        Type type = field.FieldType;
+
+        fieldInfo.IsKey = field.GetCustomAttribute<KeyAttribute>(false) != null;
+        bool isIgnored = field.GetCustomAttribute<IgnoreAttribute>(false) != null;
+
+        // Skip ignored fields
+        if (isIgnored)
+        {
+            if (fieldInfo.IsKey)
+                throw new KeyIgnoredException(field.Name);
+            return null;
+        }
+
+        bool isIndex = field.GetCustomAttribute<StringTableIndexAttribute>(false) != null;
+        LengthAttribute? lengthAttr = field.GetCustomAttribute<LengthAttribute>(false);
 
         if (type.IsPrimitive)
         {
-            Debug.Assert(lengthAttr == null, $"Length on field {field.Name} of type {type} is not supported.");
+            if (lengthAttr != null)
+                throw new FieldLengthNotAllowedException(field.Name, type);
 
             if (type == typeof(sbyte) || type == typeof(short) || type == typeof(int) || type == typeof(long))
                 fieldInfo.FieldType = FieldType.SignedInteger;
@@ -35,7 +54,7 @@ public class FieldInfo
             else if (type == typeof(float) || type == typeof(double) || type == typeof(decimal))
                 fieldInfo.FieldType = FieldType.FloatingPoint;
             else
-                Debug.Fail($"Field {field.Name} of type {type} is not supported.");
+                throw new FieldTypeNotSupportedException(field.Name, type);
 
             if (isIndex)
             {
@@ -51,13 +70,17 @@ public class FieldInfo
             Debug.Assert(!isIndex, $"Index on field {field.Name} of type {type} is not supported.");
             fieldInfo.FieldType = FieldType.Utf8String;
 
-            Debug.Assert(lengthAttr != null, $"Field {field.Name} does not have a Length attribute defined.");
-            Debug.Assert(lengthAttr.Length > 0 && lengthAttr.Length <= byte.MaxValue, $"Field {field.Name} has an invalid Length {lengthAttr.Length} defined.");
+            if (lengthAttr == null)
+                throw new FieldLengthUndefinedException(field.Name);
+
+            if (lengthAttr.Length <= 0 || lengthAttr.Length > byte.MaxValue)
+                throw new FieldLengthOutOfRangeException(field.Name, lengthAttr.Length);
+
             fieldInfo.FieldLength = (byte)lengthAttr.Length;
         }
         else
         {
-            Debug.Fail($"Field {field.Name} of type {type} is not supported.");
+            throw new FieldTypeNotSupportedException(field.Name, type);
         }
 
         return fieldInfo;

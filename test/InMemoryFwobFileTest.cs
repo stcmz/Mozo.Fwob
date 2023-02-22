@@ -1,6 +1,7 @@
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Mozo.Fwob.Exceptions;
 using Mozo.Fwob.Models;
 using System;
 using System.Linq;
@@ -14,8 +15,6 @@ public class InMemoryFwobFileTest
     {
         public int Time;
         public double Value;
-
-        public int Key => Time;
     }
 
 
@@ -39,6 +38,9 @@ public class InMemoryFwobFileTest
         Assert.IsTrue(file.FrameInfo.Fields[1].FieldType == FieldType.FloatingPoint);
         Assert.IsTrue(file.Strings.Count == 0);
         Assert.IsTrue(file.Title == "HelloFwob");
+        Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
+        Assert.ThrowsException<ArgumentException>(() => file.Title = "");
+        Assert.ThrowsException<TitleTooLongException>(() => file.Title = "0123456789abcdefg");
     }
 
     [TestMethod]
@@ -296,7 +298,7 @@ public class InMemoryFwobFileTest
         var tick2 = new Tick { Time = 13, Value = 44456.0111 };
         var tick3 = new Tick { Time = 100, Value = 1234.56 };
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick, tick3, tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick, tick3, tick2));
 
         // only two frames
         Assert.AreEqual(file.FirstFrame, tick);
@@ -333,7 +335,7 @@ public class InMemoryFwobFileTest
         Assert.IsTrue(file.GetFramesBefore(100).Count() == 2);
         Assert.IsTrue(file.GetFramesBefore(101).Count() == 2);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick2));
         Assert.AreEqual(file.FirstFrame, tick);
         Assert.AreEqual(file.LastFrame, tick3);
         Assert.IsTrue(file.FrameCount == 2);
@@ -408,7 +410,7 @@ public class InMemoryFwobFileTest
         var tick2 = new Tick { Time = 13, Value = 44456.0111 };
         var tick3 = new Tick { Time = 100, Value = 1234.56 };
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick, tick3, tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick, tick3, tick2));
 
         // no frame
         Assert.IsNull(file.FirstFrame);
@@ -425,9 +427,9 @@ public class InMemoryFwobFileTest
         Assert.IsFalse(file.GetFramesBefore(0).Any());
 
         Assert.IsTrue(file.AppendFrames(tick) == 1);
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3, tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick3, tick2));
         Assert.IsTrue(file.AppendFrames(tick3) == 1);
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick2));
 
         Assert.AreEqual(file.FirstFrame, tick);
         Assert.AreEqual(file.LastFrame, tick3);

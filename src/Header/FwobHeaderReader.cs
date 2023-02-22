@@ -15,14 +15,15 @@ public static class FwobHeaderReader
         //*********************** Signature and Version (5 bytes) ************************//
 
         // pos 0: 4 bytes
-        string sig = new string(br.ReadChars(4));
+        string sig = new(br.ReadChars(4));
         if (sig != FwobHeader.Signature)
             return null;
 
-        FwobHeader header = new();
-
-        // pos 4: 1 byte
-        header.Version = br.ReadByte();
+        FwobHeader header = new()
+        {
+            // pos 4: 1 byte
+            Version = br.ReadByte()
+        };
 
         if (header.Version != FwobHeader.CurrentVersion)
             return null;

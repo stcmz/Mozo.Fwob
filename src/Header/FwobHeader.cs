@@ -1,6 +1,6 @@
-﻿using Mozo.Fwob.Models;
+﻿using Mozo.Fwob.Exceptions;
+using Mozo.Fwob.Models;
 using System;
-using System.Diagnostics;
 using System.Linq;
 
 namespace Mozo.Fwob.Header;
@@ -69,17 +69,17 @@ public class FwobHeader
 
     public long FileLength => StringTablePosition + StringTablePreservedLength + FrameLength * FrameCount;
 
-    public static FwobHeader CreateNew<TFrame>(string title)
+    public static FwobHeader CreateNew<TFrame, TKey>(string title)
     {
-        var frameType = typeof(TFrame);
-        Debug.Assert(frameType.Name.Length <= FwobLimits.MaxFrameTypeLength);
-
         if (string.IsNullOrEmpty(title))
             throw new ArgumentNullException(nameof(title), "Argument should not be null or empty");
-        if (title.Length > FwobLimits.MaxTitleLength)
-            throw new ArgumentOutOfRangeException(nameof(title), title, $"Length of argument exceeded MaxTitleLength {FwobLimits.MaxTitleLength}");
 
-        var frameInfo = FrameInfo.FromSystem(frameType);
+        if (title.Length > FwobLimits.MaxTitleLength)
+            throw new TitleTooLongException(title, title.Length);
+
+        Type frameType = typeof(TFrame);
+
+        var frameInfo = FrameInfo.FromSystem(frameType, typeof(TKey));
 
         var header = new FwobHeader
         {
@@ -104,9 +104,9 @@ public class FwobHeader
         return header;
     }
 
-    public FrameInfo? GetFrameInfo<TFrame>()
+    public FrameInfo? GetFrameInfo<TFrame, TKey>()
     {
-        var frameInfo = FrameInfo.FromSystem<TFrame>();
+        var frameInfo = FrameInfo.FromSystem<TFrame, TKey>();
 
         if (FrameType != frameInfo.FrameType)
             return null;
@@ -120,7 +120,7 @@ public class FwobHeader
 
         for (int i = 0; i < frameInfo.Fields.Count; i++)
         {
-            var fi = frameInfo.Fields[i];
+            FieldInfo fi = frameInfo.Fields[i];
             if (FieldLengths[i] != fi.FieldLength)
                 return null;
             if (FieldNames[i] != fi.FieldName)

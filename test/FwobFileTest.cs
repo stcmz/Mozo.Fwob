@@ -1,6 +1,7 @@
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Mozo.Fwob.Exceptions;
 using Mozo.Fwob.Header;
 using Mozo.Fwob.Models;
 using System;
@@ -19,22 +20,14 @@ public class FwobFileTest
         [Length(4)]
         public string? Str;
 
-        public int Key => Time;
-
         public override bool Equals(object? obj)
         {
-            if (obj is Tick that)
-                return Time == that.Time
-                    && Value == that.Value
-                    && (Str == that.Str || Str == null && that.Str == "" || Str == "" && that.Str == null);
-            return false;
+            return GetHashCode() == obj?.GetHashCode();
         }
 
         public override int GetHashCode()
         {
-            if (Str == null)
-                return Time.GetHashCode() ^ Value.GetHashCode();
-            return Time.GetHashCode() ^ Value.GetHashCode() ^ Str.GetHashCode();
+            return HashCode.Combine(Time, Value, Str ?? string.Empty);
         }
     }
 
@@ -50,7 +43,7 @@ public class FwobFileTest
     public void Initialize()
     {
         _tempPath = Path.GetTempFileName();
-        file = FwobFile<Tick, int>.CreateNewFile(_tempPath, "HelloFwob", FileMode.Create);
+        file = FwobFile<Tick, int>.CreateNew(_tempPath, "HelloFwob", FileMode.Create);
     }
 
     [TestCleanup]
@@ -91,7 +84,8 @@ public class FwobFileTest
         Assert.AreEqual(file.Title, "0123456789abcdef");
 
         Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => file.Title = "0123456789abcdefg");
+        Assert.ThrowsException<ArgumentException>(() => file.Title = "");
+        Assert.ThrowsException<TitleTooLongException>(() => file.Title = "0123456789abcdefg");
         Assert.AreEqual(file.Title, "0123456789abcdef");
     }
     #endregion
@@ -299,7 +293,7 @@ public class FwobFileTest
 
         for (int i = 0; i < 262; i++) // (2048 - 214) / 7 = 262
             Assert.IsTrue(file.AppendString($"abc{i:d3}") == i);
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString("x"));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString("x"));
 
         for (int i = 0; i < 262; i++)
         {
@@ -315,7 +309,7 @@ public class FwobFileTest
             Assert.AreEqual(file.GetIndex($"abc{i:d3}"), i);
             Assert.AreEqual(file.GetString(i), $"abc{i:d3}");
         }
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString(""));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString(""));
     }
 
     #endregion
@@ -558,7 +552,7 @@ public class FwobFileTest
     {
         Assert.IsNotNull(file);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick3, tick5, tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick3, tick5, tick4));
     }
 
     private void ValidateFramesPartially()
@@ -599,7 +593,7 @@ public class FwobFileTest
         Assert.IsTrue(file.GetFramesBefore(100).Count() == 2);
         Assert.IsTrue(file.GetFramesBefore(101).Count() == 2);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick4));
         Assert.AreEqual(file.FirstFrame, tick3);
         Assert.AreEqual(file.LastFrame, tick5);
         Assert.IsTrue(file.FrameCount == 2);
@@ -669,7 +663,7 @@ public class FwobFileTest
         Assert.AreEqual(file.LastFrame, t);
         Assert.IsTrue(file.FrameCount == 4);
         t.Str = "abcde";
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFrames(tick));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick));
         Assert.IsTrue(file.FrameCount == 4);
 
         file.Dispose();
@@ -707,10 +701,10 @@ public class FwobFileTest
     {
         Assert.IsNotNull(file);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3, tick5, tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick3, tick5, tick4));
         TestNoFrame();
         AddOneFrame();
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick5, tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick5, tick4));
         ValidateOneFrame();
         Assert.IsTrue(file.AppendFrames(tick5) == 1);
         Assert.IsTrue(file.FrameCount == 2);
@@ -718,9 +712,9 @@ public class FwobFileTest
         Assert.AreEqual(file.LastFrame, tick5);
         Assert.IsNotNull(file.FrameInfo);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick2));
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3));
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick3));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick4));
         Assert.IsTrue(file.FrameCount == 2);
         Assert.AreEqual(file.FirstFrame, tick);
         Assert.AreEqual(file.LastFrame, tick5);
@@ -733,13 +727,13 @@ public class FwobFileTest
         Assert.IsNotNull(file);
         Assert.IsNotNull(_tempPath);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3, tick5, tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick3, tick5, tick4));
         TestNoFrame();
         AddOneFrame();
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
 
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick5, tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick5, tick4));
         ValidateOneFrame();
         Assert.IsTrue(file.AppendFrames(tick5) == 1);
         Assert.IsTrue(file.FrameCount == 2);
@@ -749,9 +743,9 @@ public class FwobFileTest
 
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick2));
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick3));
-        Assert.ThrowsException<KeyOrderingException>(() => file.AppendFramesTx(tick4));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick3));
+        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick4));
         Assert.IsTrue(file.FrameCount == 2);
         Assert.AreEqual(file.FirstFrame, tick);
         Assert.AreEqual(file.LastFrame, tick5);
@@ -800,7 +794,7 @@ public class FwobFileTest
 
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString("x"));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString("x"));
         Assert.AreEqual(file.FrameCount, 5 * 262);
 
         for (int i = 0; i < 262; i++)
@@ -820,7 +814,7 @@ public class FwobFileTest
 
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString("x"));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString("x"));
         Assert.AreEqual(file.FrameCount, 11 * 262);
 
         for (int i = 0; i < 262; i++)
@@ -841,7 +835,7 @@ public class FwobFileTest
 
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString("x"));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString("x"));
         Assert.AreEqual(file.FrameCount, 18 * 262);
 
         for (int i = 0; i < 262; i++)
@@ -866,7 +860,7 @@ public class FwobFileTest
 
         file.Dispose();
         file = new FwobFile<Tick, int>(_tempPath);
-        Assert.ThrowsException<InternalBufferOverflowException>(() => file.AppendString(""));
+        Assert.ThrowsException<StringTableOutOfSpaceException>(() => file.AppendString(""));
         Assert.AreEqual(file.FrameCount, 18 * 262);
     }
     #endregion
@@ -896,11 +890,11 @@ public class FwobFileTest
         file.Dispose();
 
         Assert.ThrowsException<ArgumentNullException>(() => FwobFile<Tick, int>.Split(_tempPath, null));
-        Assert.ThrowsException<KeyOrderingException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 0));
-        Assert.ThrowsException<KeyOrderingException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 1));
+        Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 0));
+        Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 1, 1));
         Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Split(_tempPath + ".nonexistence", 1, 2));
-        Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, -1));
-        Assert.ThrowsException<ArgumentException>(() => FwobFile<Tick, int>.Split(_tempPath, 10000));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => FwobFile<Tick, int>.Split(_tempPath, -1));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => FwobFile<Tick, int>.Split(_tempPath, 10000));
 
         int baseLength = FwobHeader.HeaderLength + FwobHeader.DefaultStringTablePreservedLength;
 
@@ -999,49 +993,62 @@ public class FwobFileTest
         Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
 
         // test empty files
-        var file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test"); file0.Dispose();
-        var file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test"); file1.Dispose();
-        var file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test2"); file2.Dispose();
+        var file0 = FwobFile<Tick, int>.CreateNew(path0, "test"); file0.Dispose();
+        var file1 = FwobFile<Tick, int>.CreateNew(path1, "test"); file1.Dispose();
+        var file2 = FwobFile<Tick, int>.CreateNew(path2, "test2"); file2.Dispose();
 
         Assert.ThrowsException<FrameNotFoundException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
 
         // test file title consistence
-        file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
-        file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
-        file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test2", FileMode.Create);
+        file0 = FwobFile<Tick, int>.CreateNew(path0, "test", FileMode.Create);
+        file1 = FwobFile<Tick, int>.CreateNew(path1, "test", FileMode.Create);
+        file2 = FwobFile<Tick, int>.CreateNew(path2, "test2", FileMode.Create);
 
         file0.AppendFrames(tick); file0.Dispose();
         file1.AppendFrames(tick); file1.Dispose();
         file2.AppendFrames(tick); file2.Dispose();
 
-        Assert.ThrowsException<FileTitleException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+        Assert.ThrowsException<TitleIncompatibleException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
 
-        file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
-        file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
-        file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+        // test frame ordering enforcement
+        file0 = FwobFile<Tick, int>.CreateNew(path0, "test", FileMode.Create);
+        file1 = FwobFile<Tick, int>.CreateNew(path1, "test", FileMode.Create);
+        file2 = FwobFile<Tick, int>.CreateNew(path2, "test", FileMode.Create);
 
         file0.AppendFrames(tick5); file0.Dispose();
         file1.AppendFrames(tick4); file1.Dispose();
         file2.AppendFrames(tick3); file2.Dispose();
 
-        Assert.ThrowsException<KeyOrderingException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+        Assert.ThrowsException<KeyOrderViolationException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
 
-        file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
-        file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
-        file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+        // test empty string table
+        file0 = FwobFile<Tick, int>.CreateNew(path0, "test", FileMode.Create);
+        file1 = FwobFile<Tick, int>.CreateNew(path1, "test", FileMode.Create);
+        file2 = FwobFile<Tick, int>.CreateNew(path2, "test", FileMode.Create);
+
+        file0.AppendFrames(tick3); file0.Dispose();
+        file1.AppendFrames(tick4); file1.Dispose();
+        file2.AppendFrames(tick5); file2.Dispose();
+
+        FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2);
+
+        // test string table exception
+        file0 = FwobFile<Tick, int>.CreateNew(path0, "test", FileMode.Create);
+        file1 = FwobFile<Tick, int>.CreateNew(path1, "test", FileMode.Create);
+        file2 = FwobFile<Tick, int>.CreateNew(path2, "test", FileMode.Create);
 
         file0.AppendString("str0"); file0.AppendFrames(tick2); file0.Dispose();
         file1.AppendString("str0"); file1.AppendString("str1"); file1.AppendFrames(tick3); file1.Dispose();
         file2.AppendString("str1"); file2.AppendFrames(tick4); file2.Dispose();
 
-        Assert.ThrowsException<StringTableException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
+        Assert.ThrowsException<StringTableIncompatibleException>(() => FwobFile<Tick, int>.Concat(_tempPath, path0, path1, path2));
 
         FwobFile<Tick, int>.Concat(_tempPath, path0);
         Assert.AreEqual(Convert.ToBase64String(File.ReadAllBytes(_tempPath)), Convert.ToBase64String(File.ReadAllBytes(path0)));
 
-        file0 = FwobFile<Tick, int>.CreateNewFile(path0, "test", FileMode.Create);
-        file1 = FwobFile<Tick, int>.CreateNewFile(path1, "test", FileMode.Create);
-        file2 = FwobFile<Tick, int>.CreateNewFile(path2, "test", FileMode.Create);
+        file0 = FwobFile<Tick, int>.CreateNew(path0, "test", FileMode.Create);
+        file1 = FwobFile<Tick, int>.CreateNew(path1, "test", FileMode.Create);
+        file2 = FwobFile<Tick, int>.CreateNew(path2, "test", FileMode.Create);
 
         for (int i = 0; i < 48; i++)
             Assert.IsTrue(file0.AppendString(i.ToString()) == i);
@@ -1084,7 +1091,7 @@ public class FwobFileTest
         file.UnloadStringTable();
 
         int k = 0;
-        foreach (var frame in file.GetFramesAfter(0))
+        foreach (Tick frame in file.GetFramesAfter(0))
         {
             if (k < 10000)
                 Assert.AreEqual(frame, new Tick { Time = k, Value = k * 3.14, Str = k.ToString() });

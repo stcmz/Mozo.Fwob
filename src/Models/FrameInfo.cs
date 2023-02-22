@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Mozo.Fwob.Exceptions;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -8,35 +9,70 @@ public class FrameInfo
 {
     public IReadOnlyList<FieldInfo> Fields { get; private set; } = new List<FieldInfo>();
 
-    public ulong FieldTypes { get; set; }
+    public ulong FieldTypes { get; private set; }
 
     public int FrameLength { get; private set; }
 
     public string? FrameType { get; private set; }
 
-    public static FrameInfo FromSystem(Type frameType)
+    public int KeyIndex { get; private set; }
+
+    public static FrameInfo FromSystem(Type frameType, Type keyType)
     {
-        var fields = frameType.GetFields();
+        if (frameType.Name.Length > FwobLimits.MaxFrameTypeLength)
+            throw new FrameTypeNameTooLongException(frameType.Name, frameType.Name.Length);
 
-        Debug.Assert(fields.Length > 0 && fields.Length <= FwobLimits.MaxFields);
+        System.Reflection.FieldInfo[] fields = frameType.GetFields();
 
-        int length = 0;
+        if (fields.Length == 0)
+            throw new NoFieldsException(frameType);
+
+        int length = 0, fieldCount = 0, keyIndex = -1, firstKeyTypeIndex = -1;
         ulong fieldTypes = 0;
 
-        var fis = new List<FieldInfo>();
-        for (int i = 0; i < fields.Length; i++)
+        List<FieldInfo> fis = new();
+
+        foreach (System.Reflection.FieldInfo field in fields)
         {
-            var fi = FieldInfo.FromSystem(fields[i]);
+            var fi = FieldInfo.FromSystem(field);
+            if (fi == null)
+                continue;
+
+            if (field.FieldType == keyType && firstKeyTypeIndex == -1)
+                firstKeyTypeIndex = fieldCount;
+
+            if (fi.IsKey)
+            {
+                if (keyIndex != -1)
+                    throw new AmbiguousKeyException(frameType, fi.FieldName, fis[keyIndex].FieldName);
+                if (field.FieldType != keyType)
+                    throw new KeyTypeMismatchException(frameType, field.Name, field.FieldType);
+                keyIndex = fieldCount;
+            }
+
             length += fi.FieldLength;
 
             Debug.Assert((ulong)fi.FieldType < 16);
-            fieldTypes |= (ulong)fi.FieldType << (i << 2);
+            fieldTypes |= (ulong)fi.FieldType << (fieldCount << 2);
 
             fis.Add(fi);
+            fieldCount++;
         }
 
-        // Key should be the first field and must be with the same type as Key property
-        Debug.Assert(fields[0].FieldType == frameType.GetProperty("Key")?.PropertyType);
+        if (fis.Count == 0)
+            throw new NoFieldsException(frameType);
+
+        if (fis.Count > FwobLimits.MaxFields)
+            throw new TooManyFieldsException(frameType, fis.Count);
+
+        if (firstKeyTypeIndex == -1)
+            throw new KeyUndefinedException(frameType);
+
+        if (keyIndex == -1)
+        {
+            keyIndex = firstKeyTypeIndex;
+            fis[keyIndex].IsKey = true;
+        }
 
         return new FrameInfo
         {
@@ -44,11 +80,12 @@ public class FrameInfo
             FrameLength = length,
             FrameType = frameType.Name,
             FieldTypes = fieldTypes,
+            KeyIndex = keyIndex,
         };
     }
 
-    public static FrameInfo FromSystem<TFrame>()
+    public static FrameInfo FromSystem<TFrame, TKey>()
     {
-        return FromSystem(typeof(TFrame));
+        return FromSystem(typeof(TFrame), typeof(TKey));
     }
 }
