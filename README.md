@@ -11,10 +11,20 @@ This repository contains the library implementation of the FWOB file format.
 * Enfores increasing order of data frames by key
 * Binary format storage
 * User-defined flat data structure
-* Supports all primitive field types including string
 * High-efficient (de)serializer (40% performance vs the best C++ implementation)
 * Built-in support for a string table
 * Supports on-disk file and in-memory storage
+
+## Capacity
+
+* File length: up to 2^63 - 1 bytes (8,192 PiB)
+* String table length: up to 2^31 - 1 bytes (2 GiB)
+* Fwob title: up to 16 bytes
+* Frame name: up to 16 bytes
+* Frame type: up to 16 fields
+* Field name: up to 8 bytes
+* Field type: of any primitive types and string type
+* String length: up to 255 bytes
 
 ## Build from source
 
@@ -25,8 +35,11 @@ dotnet restore
 # Build the entire solution
 dotnet build --no-restore
 
-# Run the test cases in the test directory
-dotnet test --no-build --verbosity normal
+# Run the test cases in the test directory and generate coverage report
+dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+
+# Visualize coverage report in HTML (requires the dotnet tool dotnet-reportgenerator-globaltool to be installed)
+reportgenerator -reports:test/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Html -historydir:CoverageHistory
 
 # Publish a portable .dll for any supported system that have the .NET Runtime/SDK installed
 dotnet publish -c Release --no-self-contained
@@ -41,18 +54,19 @@ dotnet pack -c Release
 
 The data structure can be any class, structure or record that implements `Mozo.Fwob.Models.IFrame<TKey>`, where `TKey` is a struct type and implements `IComparable<TKey>`.
 
-The data structure can have fields, methods, indexers, properties, custom parameterized constructors and non-public members. But only public fields and the `Key` property getter will be used and accessed by the FWOB library.
+The data structure can have fields, methods, indexers, properties, custom parameterized constructors and non-public members. But only public fields and the parameterless constructor will be accessed by the FWOB library.
 
-Since the frame must be fixed-width, a string type must define a fixed length. This can be achieved by using the `Mozo.Fwob.LengthAttribute`.
+Since the frame must be fixed-width, a field of string type must define a fixed length. This can be achieved by annotating with the `Mozo.Fwob.LengthAttribute`.
 
 Here is an example,
 
 ```csharp
 public class StockTick : IFrame<uint>
 {
-    public uint Time;
-
     public uint Price;
+
+    [Key]
+    public uint Time;
 
     public double RealPrice
     {
@@ -62,25 +76,28 @@ public class StockTick : IFrame<uint>
 
     public int Size;
 
+    [Ignore]
+    public int Extra;
+
     [Length(4)]
     public string SpecCond;
-
-    public uint Key => Time;
 }
 ```
 
-Only the four public fields `Time`, `Price`, `Size` and `SpecCond` will hold data in a FWOB file. The `RealPrice` and `Key` property won't hold any data, though the `Key` property will be used by the FWOB library to compare and order the frames in the file.
+Only the public fields `Price`, `Time`, `Size` and `SpecCond` will hold data in a FWOB file. The `RealPrice` property, which is not a field, and the `Extra` field, which is ignored with the `Mozo.Fwob.IgnoreAttribute` annotation, won't hold any data in the file. By convention, the library use the first field defined of `TKey` type as the key. To specify a custom key, use the `Mozo.Fwob.KeyAttribute` to annotate a field of `TKey` type. The key field will be used by the library to compare and order the frames in the file.
+
+The library checks the schema in the initialization of either an `FwobFile<TFrame, TKey>` or an `InMemoryFwobFile<TFrame, TKey>` file object. Exceptions will be thrown if conflicts is detected or rules are violated.
 
 ### Create an on-disk FWOB file
 
 ```csharp
-var fwobFile = FwobFile<StockTick, uint>.CreateNewFile(path, "FileTitle");
+var fwobFile = FwobFile<StockTick, uint>.CreateNew(fileName, "FileTitle");
 ```
 
 ### Open an existing on-disk FWOB file
 
 ```csharp
-var fwobFile = new FwobFile<StockTick, uint>(path);
+var fwobFile = new FwobFile<StockTick, uint>(fileName);
 ```
 
 ### Create an in-memory FWOB file
@@ -140,7 +157,7 @@ fwobFile.ClearFrames();
 ### String table
 
 ```csharp
-// Load and unload the string table into memory, not needed in the in-memory storage
+// Load and unload the string table into memory, not needed for the in-memory storage
 fwobFile.LoadStringTable();
 fwobFile.UnloadStringTable();
 

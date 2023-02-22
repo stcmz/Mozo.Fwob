@@ -19,13 +19,13 @@ dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 # Delete previous test run reports - note if you're getting wrong results do a Solution Clean and Rebuild to remove stale DLLs in the bin folder
 Remove-Item -Recurse -Force $dir/CoverageReport/ 2>$null
 
-# To keep a history of the Code Coverage we need to use the argument: -historydir:SOME_DIRECTORY 
+# To keep a history of the Code Coverage we need to use the argument: -historydir:SOME_DIRECTORY
 if (!(Test-Path -path $dir/CoverageHistory)) {
     New-Item -ItemType directory -Path $dir/CoverageHistory
 }
 
 # Generate the Code Coverage HTML Report
-reportgenerator -reports:"$dir/**/coverage.cobertura.xml" -targetdir:"$dir/CoverageReport" -reporttypes:Html -historydir:$dir/CoverageHistory 
+reportgenerator -reports:"$dir/**/coverage.cobertura.xml" -targetdir:"$dir/CoverageReport" -reporttypes:Html -historydir:$dir/CoverageHistory
 
 # Open the Code Coverage HTML Report (if running on a WorkStation)
 $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
