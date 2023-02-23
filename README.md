@@ -23,7 +23,7 @@ This repository contains the library implementation of the FWOB file format.
 * Frame name: up to 16 bytes
 * Frame type: up to 16 fields
 * Field name: up to 8 bytes
-* Field type: of any primitive types and string type
+* Field type: of any primitive types (non-nullable) and string type
 * String length: up to 255 bytes
 
 ## Build from source
@@ -52,7 +52,7 @@ dotnet pack -c Release
 
 ### Define your frame data structure
 
-The data structure can be any class, structure or record that implements `Mozo.Fwob.Models.IFrame<TKey>`, where `TKey` is a struct type and implements `IComparable<TKey>`.
+The data structure can be any class or record class that implements `Mozo.Fwob.Models.IFrame<TKey>`, where `TKey` is a struct type and implements `IComparable<TKey>`.
 
 The data structure can have fields, methods, indexers, properties, custom parameterized constructors and non-public members. But only public fields and the parameterless constructor will be accessed by the FWOB library.
 

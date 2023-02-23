@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace Mozo.Fwob.Models;
 
 public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, TKey>, IStringTable
-    where TFrame : class, IFrame<TKey>
+    where TFrame : class, IFrame<TKey>, new()
     where TKey : struct, IComparable<TKey>
 
 {

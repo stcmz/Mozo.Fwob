@@ -8,7 +8,7 @@ using System.Linq;
 namespace Mozo.Fwob;
 
 public class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>
-    where TFrame : class, IFrame<TKey>
+    where TFrame : class, IFrame<TKey>, new()
     where TKey : struct, IComparable<TKey>
 {
     public override string Title

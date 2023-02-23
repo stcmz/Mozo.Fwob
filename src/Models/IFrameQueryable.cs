@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Mozo.Fwob.Models;
 
 public interface IFrameQueryable<TFrame, TKey>
-    where TFrame : IFrame<TKey>
+    where TFrame : class, IFrame<TKey>, new()
     where TKey : struct, IComparable<TKey>
 {
     /// <summary>
