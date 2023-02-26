@@ -27,13 +27,19 @@ jobs:
       run: dotnet restore
 
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build -c Release --no-restore
 
     - name: Test
-      run: dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+      run: dotnet test -c Release --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 
-    - name: Publish
-      run: dotnet publish -c Release --no-self-contained
+    - name: Publish for .NET Standard 2.0
+      run: dotnet publish src -c Release -f netstandard2.0 --no-self-contained
+
+    - name: Publish for .NET Framework 4.8
+      run: dotnet publish src -c Release -f net48 --no-self-contained
+
+    - name: Publish for .NET 7.0
+      run: dotnet publish src -c Release -f net7.0 --no-self-contained
 
     - name: Pack
       run: dotnet pack -c Release
