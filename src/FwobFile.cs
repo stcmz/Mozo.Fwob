@@ -23,14 +23,17 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
         get => Header.Title;
         set
         {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-            if (value.Length == 0)
-                throw new ArgumentException("Argument can not be empty", nameof(value));
-            if (value.Length > FwobLimits.MaxTitleLength)
-                throw new TitleTooLongException(value, value.Length);
             if (Stream == null)
                 throw new FileNotOpenedException();
+
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            if (value.Length == 0)
+                throw new ArgumentException("Argument can not be empty", nameof(value));
+
+            if (value.Length > FwobLimits.MaxTitleLength)
+                throw new TitleTooLongException(value, value.Length);
 
             Header.Title = value;
 
@@ -45,7 +48,6 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
 
     public FwobHeader Header { get; private set; }
 
-    private bool IsFileOpen => Stream != null && FilePath != null;
 
     private const int BlockCopyBufSize = 4 * 1024 * 1024;
 
@@ -63,18 +65,28 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
 
         FwobHeader? header = br.ReadHeader();
         if (header == null)
+        {
+            Dispose();
             throw new CorruptedFileHeaderException(path);
+        }
 
         Header = header;
 
         FrameInfo? frameInfo = header.GetFrameInfo<TFrame, TKey>();
         if (frameInfo == null)
+        {
+            Dispose();
             throw new FrameTypeMismatchException(path, typeof(TFrame));
+        }
 
         FrameInfo = frameInfo;
 
         if (Header.FileLength != br.BaseStream.Length)
-            throw new CorruptedFileLengthException(path, Header.FileLength, br.BaseStream.Length);
+        {
+            long actualLength = br.BaseStream.Length;
+            Dispose();
+            throw new CorruptedFileLengthException(path, Header.FileLength, actualLength);
+        }
 
         if (FrameCount > 0)
         {
@@ -83,11 +95,22 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
         }
     }
 
+    ~FwobFile()
+    {
+        Dispose();
+    }
+
+    /// <summary>
+    /// Close the file and release the resources. This method is idempotent.
+    /// </summary>
     public void Close()
     {
         Dispose();
     }
 
+    /// <summary>
+    /// This method won't be called if exception was thrown in the constructor because the object has not successfully created.
+    /// </summary>
     public void Dispose()
     {
         if (Stream != null)

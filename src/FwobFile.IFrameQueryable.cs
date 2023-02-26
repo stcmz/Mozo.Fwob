@@ -20,23 +20,40 @@ public partial class FwobFile<TFrame, TKey>
     // Cached first and last frames
     private TFrame? _firstFrame = null, _lastFrame = null;
 
-    public override TFrame? FirstFrame => _firstFrame;
+    public override TFrame? FirstFrame
+    {
+        get
+        {
+            if (Stream == null)
+                throw new FileNotOpenedException();
+            return _firstFrame;
+        }
+    }
 
-    public override TFrame? LastFrame => _lastFrame;
+    public override TFrame? LastFrame
+    {
+        get
+        {
+            if (Stream == null)
+                throw new FileNotOpenedException();
+            return _lastFrame;
+        }
+    }
 
     public override long FrameCount
     {
         get
         {
-            Debug.Assert(IsFileOpen);
+            if (Stream == null)
+                throw new FileNotOpenedException();
             return Header.FrameCount;
         }
     }
 
     public override TFrame? GetFrame(long index)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (index < 0 || index >= Header.FrameCount)
             return null;
@@ -78,9 +95,11 @@ public partial class FwobFile<TFrame, TKey>
 
     public override IEnumerable<TFrame> GetFrames(TKey firstKey, TKey lastKey)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
-        Debug.Assert(firstKey.CompareTo(lastKey) <= 0);
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
+        if (firstKey.CompareTo(lastKey) > 0)
+            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}");
 
         if (Header.FrameCount == 0)
             yield break;
@@ -103,8 +122,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override IEnumerable<TFrame> GetFramesAfter(TKey firstKey)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (Header.FrameCount == 0)
             yield break;
@@ -122,8 +141,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override IEnumerable<TFrame> GetFramesBefore(TKey lastKey)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (Header.FrameCount == 0)
             yield break;
@@ -141,11 +160,11 @@ public partial class FwobFile<TFrame, TKey>
 
     public override long AppendFrames(IEnumerable<TFrame> frames)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (frames == null)
             throw new ArgumentNullException(nameof(frames));
-
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
 
         IEnumerator<TFrame> it = frames.GetEnumerator();
         if (!it.MoveNext())
@@ -165,6 +184,7 @@ public partial class FwobFile<TFrame, TKey>
                 _lastFrame = last;
                 Header.FrameCount += count;
                 bw.UpdateFrameCount(Header);
+
                 throw new KeyOrderViolationException(FilePath!);
             }
 
@@ -184,11 +204,11 @@ public partial class FwobFile<TFrame, TKey>
 
     public override long AppendFramesTx(IEnumerable<TFrame> frames)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (frames == null)
             throw new ArgumentNullException(nameof(frames));
-
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
 
         TFrame? last = LastFrame;
         List<TFrame> list = new();
@@ -197,6 +217,7 @@ public partial class FwobFile<TFrame, TKey>
         {
             if (last != null && GetKey(frame).CompareTo(GetKey(last)) < 0)
                 throw new KeyOrderViolationException(FilePath!);
+
             last = frame;
             list.Add(frame);
         }
@@ -223,8 +244,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override long DeleteFramesAfter(TKey firstKey)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (Header.FrameCount == 0)
             return 0;
@@ -256,8 +277,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override long DeleteFramesBefore(TKey lastKey)
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (Header.FrameCount == 0)
             return 0;
@@ -306,8 +327,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override void ClearFrames()
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         if (Header.FrameCount == 0)
             return;

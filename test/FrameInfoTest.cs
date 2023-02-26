@@ -2,6 +2,7 @@
 using Mozo.Fwob.Exceptions;
 using Mozo.Fwob.Models;
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Mozo.Fwob.UnitTest;
@@ -92,7 +93,7 @@ public class FrameInfoTest
     }
 
     private void ValidateFrameInfo<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
-        where TFrame : class, IFrame<TKey>
+        where TFrame : class, IFrame<TKey>, new()
         where TKey : struct, IComparable<TKey>
     {
         Assert.IsTrue(file.FrameInfo.FrameLength == 59);
@@ -282,7 +283,7 @@ public class FrameInfoTest
     }
 
     private void ValidateFrameInfoIgnored<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
-        where TFrame : class, IFrame<TKey>
+        where TFrame : class, IFrame<TKey>, new()
         where TKey : struct, IComparable<TKey>
     {
         Assert.IsTrue(file.FrameInfo.FrameLength == 29);
@@ -370,23 +371,25 @@ public class FrameInfoTest
         public int Int3;
     }
 
-    [TestMethod]
-    public void TestIgnoredKeyInMemory()
+    private static void TestExceptionThrown<TException, TFrame, TKey>()
+        where TException : Exception
+        where TFrame : class, IFrame<TKey>, new()
+        where TKey : struct, IComparable<TKey>
     {
-        Assert.ThrowsException<KeyIgnoredException>(() => new InMemoryFwobFile<IgnoredKeyTick, int>("TestTypes"));
+        Assert.ThrowsException<TException>(() => new InMemoryFwobFile<TFrame, TKey>("TestTypes"));
+
+        string temp = Path.GetTempFileName();
+        Assert.ThrowsException<TException>(() =>
+        {
+            using (var file = FwobFile<TFrame, TKey>.CreateNew(temp, "TestTypes", FileMode.Open)) { }
+        });
+        File.Delete(temp);
     }
 
     [TestMethod]
-    public void TestIgnoredKeyInFile()
+    public void TestIgnoredKey()
     {
-        Assert.ThrowsException<KeyIgnoredException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<IgnoredKeyTick, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<KeyIgnoredException, IgnoredKeyTick, int>();
     }
 
     public class MultiKeysTick : IFrame<int>
@@ -399,22 +402,9 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestMultiKeysInMemory()
+    public void TestMultiKeys()
     {
-        Assert.ThrowsException<AmbiguousKeyException>(() => new InMemoryFwobFile<MultiKeysTick, int>("TestTypes"));
-    }
-
-    [TestMethod]
-    public void TestMultiKeysInFile()
-    {
-        Assert.ThrowsException<AmbiguousKeyException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<MultiKeysTick, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<AmbiguousKeyException, MultiKeysTick, int>();
     }
 
     public class KeyTypeMismatchT : IFrame<uint>
@@ -426,22 +416,9 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestKeyTypeMismatchInMemory()
+    public void TestKeyTypeMismatch()
     {
-        Assert.ThrowsException<KeyTypeMismatchException>(() => new InMemoryFwobFile<KeyTypeMismatchT, uint>("TestTypes"));
-    }
-
-    [TestMethod]
-    public void TestKeyTypeMismatchInFile()
-    {
-        Assert.ThrowsException<KeyTypeMismatchException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<KeyTypeMismatchT, uint>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<KeyTypeMismatchException, KeyTypeMismatchT, uint>();
     }
 
     public class KeyUndefinedTick : IFrame<uint>
@@ -452,22 +429,21 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestKeyUndefinedInMemory()
+    public void TestKeyUndefined()
     {
-        Assert.ThrowsException<KeyUndefinedException>(() => new InMemoryFwobFile<KeyUndefinedTick, uint>("TestTypes"));
+        TestExceptionThrown<KeyUndefinedException, KeyUndefinedTick, uint>();
+    }
+
+    public class LongFieldNameT : IFrame<uint>
+    {
+        public int ShortInt;
+        public int VeryLongFieldName;
     }
 
     [TestMethod]
-    public void TestKeyUndefinedInFile()
+    public void TestLongFieldName()
     {
-        Assert.ThrowsException<KeyUndefinedException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<KeyUndefinedTick, uint>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<FieldNameTooLongException, LongFieldNameT, uint>();
     }
 
     public class NoFieldsTick : IFrame<uint>
@@ -481,22 +457,9 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestNoFieldsInMemory()
+    public void TestNoFields()
     {
-        Assert.ThrowsException<NoFieldsException>(() => new InMemoryFwobFile<NoFieldsTick, uint>("TestTypes"));
-    }
-
-    [TestMethod]
-    public void TestNoFieldsInFile()
-    {
-        Assert.ThrowsException<NoFieldsException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<NoFieldsTick, uint>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<NoFieldsException, NoFieldsTick, uint>();
     }
 
     public class TooManyFieldsT : IFrame<int>
@@ -521,22 +484,9 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestTooManyFieldsInMemory()
+    public void TestTooManyFields()
     {
-        Assert.ThrowsException<TooManyFieldsException>(() => new InMemoryFwobFile<TooManyFieldsT, int>("TestTypes"));
-    }
-
-    [TestMethod]
-    public void TestTooManyFieldsInFile()
-    {
-        Assert.ThrowsException<TooManyFieldsException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<TooManyFieldsT, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<TooManyFieldsException, TooManyFieldsT, int>();
     }
 
     public class LenOutOfRangeT : IFrame<int>
@@ -554,31 +504,10 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestLengthOutOfRangeInMemory()
+    public void TestLengthOutOfRange()
     {
-        Assert.ThrowsException<FieldLengthOutOfRangeException>(() => new InMemoryFwobFile<LenOutOfRangeT, int>("TestTypes"));
-        Assert.ThrowsException<FieldLengthOutOfRangeException>(() => new InMemoryFwobFile<LenOutOfRangeT2, int>("TestTypes"));
-    }
-
-    [TestMethod]
-    public void TestLengthOutOfRangeInFile()
-    {
-        Assert.ThrowsException<FieldLengthOutOfRangeException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<LenOutOfRangeT, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
-        Assert.ThrowsException<FieldLengthOutOfRangeException>(() =>
-        {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<LenOutOfRangeT2, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
-        });
+        TestExceptionThrown<FieldLengthOutOfRangeException, LenOutOfRangeT, int>();
+        TestExceptionThrown<FieldLengthOutOfRangeException, LenOutOfRangeT2, int>();
     }
 
     public class LengthUndefinedT : IFrame<int>
@@ -588,22 +517,115 @@ public class FrameInfoTest
     }
 
     [TestMethod]
-    public void TestLengthUndefinedInMemory()
+    public void TestLengthUndefined()
     {
-        Assert.ThrowsException<FieldLengthUndefinedException>(() => new InMemoryFwobFile<LengthUndefinedT, int>("TestTypes"));
+        TestExceptionThrown<FieldLengthUndefinedException, LengthUndefinedT, int>();
+    }
+
+    public class LenNotAllowedT : IFrame<int>
+    {
+        [Length(3)]
+        public int Int0;
+        [Length(3)]
+        public string? Str;
     }
 
     [TestMethod]
-    public void TestLengthUndefinedInFile()
+    public void TestLengthNotAllowed()
     {
-        Assert.ThrowsException<FieldLengthUndefinedException>(() =>
+        TestExceptionThrown<FieldLengthNotAllowedException, LenNotAllowedT, int>();
+    }
+
+    public class FrameTypeNameTooLongTick : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+    }
+
+    [TestMethod]
+    public void TestFrameTypeNameTooLong()
+    {
+        TestExceptionThrown<FrameTypeNameTooLongException, FrameTypeNameTooLongTick, int>();
+    }
+
+    public class ArrayFieldT : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public byte[]? Bytes;
+    }
+
+    public class SubclassFieldT : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public class Subclass { }
+        public Subclass? Sub;
+    }
+
+    public class ListFieldT : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public List<int>? List;
+    }
+
+    public class TupleFieldT : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public (int, int)? List;
+    }
+
+    public class NullableFieldT : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public int? Int1;
+    }
+
+    [TestMethod]
+    public void TestFieldTypeNotSupported()
+    {
+        TestExceptionThrown<FieldTypeNotSupportedException, ArrayFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, SubclassFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, ListFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, TupleFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, NullableFieldT, int>();
+    }
+
+    public class Tick1 : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public int Int1;
+    }
+
+    public class Tick2 : IFrame<int>
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public int Int1;
+    }
+
+    [TestMethod]
+    public void TestFrameTypeMismatch()
+    {
+        string temp = Path.GetTempFileName();
+        Assert.ThrowsException<FrameTypeMismatchException>(() =>
         {
-            string temp = Path.GetTempFileName();
-            using (var file = FwobFile<LengthUndefinedT, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-            {
-            }
-            File.Delete(temp);
+            using (var file = FwobFile<Tick1, int>.CreateNew(temp, "TestTypes", FileMode.Open)) { }
+            using (var file = new FwobFile<Tick2, int>(temp)) { }
         });
+        File.Delete(temp);
     }
 
     public class UnsupportedTick : IFrame<ulong>

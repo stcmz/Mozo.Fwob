@@ -22,7 +22,7 @@ internal static class FwobFrameWriterGenerator<TFrame>
         ParameterExpression bw = Expression.Parameter(typeof(BinaryWriter), nameof(bw));
         ParameterExpression frame = Expression.Parameter(typeof(TFrame), nameof(frame));
 
-        List<Expression> expressions = new();
+        List<Expression> writeExpressions = new(), ifExpressions = new();
 
         IEnumerable<FieldInfo> fields = typeof(TFrame)
             .GetFields()
@@ -55,7 +55,7 @@ internal static class FwobFrameWriterGenerator<TFrame>
                 Debug.Assert(exceptionCtor != null);
                 NewExpression exceptionExp = Expression.New(exceptionCtor, exceptionFieldName, fieldExp, lengthProp); // new StringTooLongException(...)
                 ConditionalExpression ifExp = Expression.IfThen(Expression.AndAlso(notNull, greaterThan), Expression.Throw(exceptionExp)); // if (...) throw ...
-                expressions.Add(ifExp);
+                ifExpressions.Add(ifExp);
 
                 // [Expression] (frame.{field} ?? string.Empty).PadRight(length).ToCharArray()
                 MethodInfo? padRightMethod = typeof(string).GetMethod(nameof(string.PadRight), new[] { typeof(int) });
@@ -82,10 +82,10 @@ internal static class FwobFrameWriterGenerator<TFrame>
 
             // [Expression] bw.Write({valueParam});
             MethodCallExpression assignExp = Expression.Call(bw, writeMethod, valueParam);
-            expressions.Add(assignExp);
+            writeExpressions.Add(assignExp);
         }
 
-        BlockExpression blockExpr = Expression.Block(expressions);
+        BlockExpression blockExpr = Expression.Block(ifExpressions.Concat(writeExpressions));
 
         var lambda = Expression.Lambda<Action<BinaryWriter, TFrame>>(blockExpr, bw, frame);
 

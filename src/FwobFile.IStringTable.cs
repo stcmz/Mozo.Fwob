@@ -22,11 +22,11 @@ public partial class FwobFile<TFrame, TKey>
 
     public void LoadStringTable()
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (_isStringTableLoaded)
             return;
-
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
 
         using BinaryReader br = new(Stream, Encoding.UTF8, true);
 
@@ -51,6 +51,9 @@ public partial class FwobFile<TFrame, TKey>
         _isStringTableLoaded = true;
     }
 
+    /// <summary>
+    /// Release the resources associated with the string table. This method is idempotent.
+    /// </summary>
     public void UnloadStringTable()
     {
         if (!_isStringTableLoaded)
@@ -61,23 +64,32 @@ public partial class FwobFile<TFrame, TKey>
         _isStringTableLoaded = false;
     }
 
-    public override IReadOnlyList<string> Strings => _strings;
+    public override IReadOnlyList<string> Strings
+    {
+        get
+        {
+            if (Stream == null)
+                throw new FileNotOpenedException();
+            return _strings;
+        }
+    }
 
     public override int StringCount
     {
         get
         {
+            if (Stream == null)
+                throw new FileNotOpenedException();
+
             if (_isStringTableLoaded)
                 return _strings.Count;
 
-            Debug.Assert(IsFileOpen);
             return Header.StringCount;
         }
     }
 
     private IEnumerable<(int index, string str)> LookupStringInFile()
     {
-        Debug.Assert(IsFileOpen);
         Debug.Assert(Stream != null);
 
         using BinaryReader br = new(Stream, Encoding.UTF8, true);
@@ -91,6 +103,9 @@ public partial class FwobFile<TFrame, TKey>
 
     public override string? GetString(int index)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (index < 0 || index >= Header.StringCount)
             throw new ArgumentOutOfRangeException(nameof(index));
 
@@ -106,6 +121,9 @@ public partial class FwobFile<TFrame, TKey>
 
     public override int GetIndex(string str)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (str == null)
             throw new ArgumentNullException(nameof(str));
 
@@ -121,16 +139,15 @@ public partial class FwobFile<TFrame, TKey>
 
     public override int AppendString(string str)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (str == null)
             throw new ArgumentNullException(nameof(str));
 
         int index = GetIndex(str);
-
         if (index != -1)
             return index;
-
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
 
         int bytes = Encoding.UTF8.GetByteCount(str);
         int length = bytes < 128 ? 1 : bytes < 128 * 128 ? 2 : bytes < 128 * 128 * 128 ? 3 : 4;
@@ -165,6 +182,9 @@ public partial class FwobFile<TFrame, TKey>
 
     public override bool ContainsString(string str)
     {
+        if (Stream == null)
+            throw new FileNotOpenedException();
+
         if (str == null)
             throw new ArgumentNullException(nameof(str));
 
@@ -180,8 +200,8 @@ public partial class FwobFile<TFrame, TKey>
 
     public override void ClearStrings()
     {
-        Debug.Assert(IsFileOpen);
-        Debug.Assert(Stream != null);
+        if (Stream == null)
+            throw new FileNotOpenedException();
 
         using (BinaryWriter bw = new(Stream, Encoding.UTF8, true))
         {

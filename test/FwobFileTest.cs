@@ -5,6 +5,7 @@ using Mozo.Fwob.Exceptions;
 using Mozo.Fwob.Header;
 using Mozo.Fwob.Models;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -54,6 +55,69 @@ public class FwobFileTest
 
         file.Dispose();
         File.Delete(_tempPath);
+    }
+
+    [TestMethod]
+    public void TestFileFormatIntegrity()
+    {
+        string temp = Path.GetTempFileName();
+        Assert.ThrowsException<CorruptedFileHeaderException>(() =>
+        {
+            byte[] bytes = Enumerable.Range(0, 255).Select(o => (byte)o).ToArray();
+            File.WriteAllBytes(temp, bytes);
+            using FwobFile<Tick, int> file = new(temp);
+        });
+        File.Delete(temp);
+
+        Assert.ThrowsException<CorruptedFileLengthException>(() =>
+        {
+            using (var file = FwobFile<Tick, int>.CreateNew(temp, "TestTick"))
+            {
+                file.AppendFrames(tick, tick2, tick3, tick4, tick5);
+            }
+            File.AppendAllText(temp, "A");
+            using FwobFile<Tick, int> file2 = new(temp);
+        });
+        File.Delete(temp);
+
+        Assert.ThrowsException<CorruptedFileLengthException>(() =>
+        {
+            using (var file = FwobFile<Tick, int>.CreateNew(temp, "TestTick"))
+            {
+                file.AppendFrames(tick, tick2, tick3, tick4, tick5);
+            }
+            using (FileStream file2 = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file2.Seek(170, SeekOrigin.Begin);
+                file2.Write(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
+            }
+            using FwobFile<Tick, int> file3 = new(temp);
+        });
+        File.Delete(temp);
+
+        Assert.ThrowsException<CorruptedStringTableLengthException>(() =>
+        {
+            long stPos;
+            using (var file = FwobFile<Tick, int>.CreateNew(temp, "TestTick"))
+            {
+                file.AppendFrames(tick, tick2, tick3, tick4, tick5);
+                file.AppendString("asdf");
+                file.AppendString("asdf");
+                file.AppendString("asdf2");
+                file.AppendString("asdf3");
+                stPos = file.Header.StringTablePosition;
+            }
+            using (FileStream file2 = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file2.Seek(stPos, SeekOrigin.Begin);
+                file2.Write(new byte[] { 5 });
+            }
+            using (FwobFile<Tick, int> file3 = new(temp))
+            {
+                file3.LoadStringTable();
+            }
+        });
+        File.Delete(temp);
     }
 
     #region Header testing
@@ -663,6 +727,11 @@ public class FwobFileTest
         Assert.AreEqual(file.LastFrame, t);
         Assert.IsTrue(file.FrameCount == 4);
         t.Str = "abcde";
+        Assert.ThrowsException<StringTooLongException>(() => file.AppendFrames(t));
+        Assert.IsNull(file.GetFrame(4));
+        t.Str = "abcd";
+        Assert.AreEqual(file.LastFrame, t);
+        Assert.IsTrue(file.FrameCount == 4);
         Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick));
         Assert.IsTrue(file.FrameCount == 4);
 
@@ -905,6 +974,7 @@ public class FwobFileTest
         Assert.IsTrue(File.Exists(path1));
         Assert.IsTrue(new FileInfo(path0).Length == baseLength + 100 * 16);
         Assert.IsTrue(new FileInfo(path1).Length == baseLength + 9900 * 16);
+
         using (var ff = new FwobFile<Tick, int>(path0))
         {
             Assert.IsTrue(ff.FrameCount == 100);
@@ -936,6 +1006,7 @@ public class FwobFileTest
         Assert.IsTrue(new FileInfo(path0).Length == baseLength + 1 * 16);
         Assert.IsTrue(new FileInfo(path1).Length == baseLength + 9998 * 16);
         Assert.IsTrue(new FileInfo(path2).Length == baseLength + 1 * 16);
+
         using (var ff = new FwobFile<Tick, int>(path0))
         {
             ff.LoadStringTable();
@@ -1242,5 +1313,57 @@ public class FwobFileTest
         Assert.IsTrue(file.FrameCount == 0);
         Assert.AreEqual(file.FirstFrame, null);
         Assert.AreEqual(file.LastFrame, null);
+    }
+
+    [TestMethod]
+    public void TestFileClosed()
+    {
+        Assert.IsNotNull(file);
+        Assert.IsNotNull(_tempPath);
+
+        file.Close();
+
+        Assert.IsNull(file.FilePath);
+        Assert.IsNull(file.Stream);
+
+        Assert.ThrowsException<FileNotOpenedException>(() => file.Title = "ABC");
+
+        // When closed the header is reset to a blank one
+        FwobHeader header = file.Header;
+        // The schema is not related to the file but the generic type only
+        FrameInfo frameInfo = file.FrameInfo;
+
+        // All members of IFrameQueryable<TFrame, TKey> should throw exception
+        Assert.ThrowsException<FileNotOpenedException>(() => file.FrameCount);
+        Assert.ThrowsException<FileNotOpenedException>(() => file.FirstFrame);
+        Assert.ThrowsException<FileNotOpenedException>(() => file.LastFrame);
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetFrame(0));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetFrames(0).Any());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetFrames(0, 1000).Any());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetFramesAfter(0).Any());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetFramesBefore(0).Any());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFrames(tick, tick2));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFrames(new List<Tick> { tick }));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFramesTx(tick, tick2));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFramesTx(new List<Tick> { tick }));
+        //Assert.ThrowsException<FileNotOpenedException>(() => file.DeleteFrames(0));
+        //Assert.ThrowsException<FileNotOpenedException>(() => file.DeleteFrames(0, 1000));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.DeleteFramesAfter(0));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.DeleteFramesBefore(0));
+        Assert.ThrowsException<FileNotOpenedException>(file.ClearFrames);
+
+        // All members of IStringTable should throw exception
+        Assert.ThrowsException<FileNotOpenedException>(() => file.Strings);
+        Assert.ThrowsException<FileNotOpenedException>(() => file.StringCount);
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetString(0));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetIndex("asdf"));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.AppendString("asdf"));
+        Assert.ThrowsException<FileNotOpenedException>(() => file.ContainsString("asdf"));
+        Assert.ThrowsException<FileNotOpenedException>(file.ClearStrings);
+
+        // It should throw in loading but not in unloading or closing
+        Assert.ThrowsException<FileNotOpenedException>(file.LoadStringTable);
+        file.UnloadStringTable();
+        file.Close();
     }
 }
