@@ -41,8 +41,8 @@ dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOut
 # Visualize coverage report in HTML (requires the dotnet tool dotnet-reportgenerator-globaltool to be installed)
 reportgenerator -reports:test/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Html -historydir:CoverageHistory
 
-# Publish a portable .dll for any supported system that have the .NET Runtime/SDK installed
-dotnet publish -c Release --no-self-contained
+# Publish a portable Mozo.Fwob.dll for any supported system that have the .NET 7.0 installed
+dotnet publish src -c Release -f net7.0 --no-self-contained
 
 # Pack the built manifests into a .nupkg package
 dotnet pack -c Release
