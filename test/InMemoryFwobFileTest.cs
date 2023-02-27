@@ -11,7 +11,7 @@ namespace Mozo.Fwob.UnitTest;
 [TestClass]
 public class InMemoryFwobFileTest
 {
-    private class Tick : IFrame<int>
+    private class Tick
     {
         public int Time;
         public double Value;

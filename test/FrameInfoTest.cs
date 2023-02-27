@@ -10,7 +10,7 @@ namespace Mozo.Fwob.UnitTest;
 [TestClass]
 public class FrameInfoTest
 {
-    public class TypedTick : IFrame<ulong>
+    public class TypedTick
     {
         public ulong ULong;
         public uint UInt;
@@ -30,7 +30,7 @@ public class FrameInfoTest
         public long Index;
     }
 
-    public class TypedTickWithKey : IFrame<ulong>
+    public class TypedTickWithKey
     {
         [Key]
         public ulong ULong;
@@ -51,7 +51,7 @@ public class FrameInfoTest
         public long Index;
     }
 
-    public class TypedTickFloat : IFrame<float>
+    public class TypedTickFloat
     {
         public ulong ULong;
         public uint UInt;
@@ -71,7 +71,7 @@ public class FrameInfoTest
         public long Index;
     }
 
-    public class FloatWithKeyTick : IFrame<float>
+    public class FloatWithKeyTick
     {
         public ulong ULong;
         public uint UInt;
@@ -93,7 +93,7 @@ public class FrameInfoTest
     }
 
     private void ValidateFrameInfo<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
-        where TFrame : class, IFrame<TKey>, new()
+        where TFrame : class, new()
         where TKey : struct, IComparable<TKey>
     {
         Assert.IsTrue(file.FrameInfo.FrameLength == 59);
@@ -229,7 +229,7 @@ public class FrameInfoTest
         File.Delete(temp);
     }
 
-    public class IgnoredTick : IFrame<ushort>
+    public class IgnoredTick
     {
         public ulong ULong;
         [Ignore]
@@ -255,7 +255,7 @@ public class FrameInfoTest
         public long Index;
     }
 
-    public class IgnoredTickKey : IFrame<int>
+    public class IgnoredTickKey
     {
         public ulong ULong;
         [Ignore]
@@ -283,7 +283,7 @@ public class FrameInfoTest
     }
 
     private void ValidateFrameInfoIgnored<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
-        where TFrame : class, IFrame<TKey>, new()
+        where TFrame : class, new()
         where TKey : struct, IComparable<TKey>
     {
         Assert.IsTrue(file.FrameInfo.FrameLength == 29);
@@ -361,7 +361,7 @@ public class FrameInfoTest
         File.Delete(temp);
     }
 
-    public class IgnoredKeyTick : IFrame<int>
+    public class IgnoredKeyTick
     {
         public int Int1;
         [Key]
@@ -373,7 +373,7 @@ public class FrameInfoTest
 
     private static void TestExceptionThrown<TException, TFrame, TKey>()
         where TException : Exception
-        where TFrame : class, IFrame<TKey>, new()
+        where TFrame : class, new()
         where TKey : struct, IComparable<TKey>
     {
         Assert.ThrowsException<TException>(() => new InMemoryFwobFile<TFrame, TKey>("TestTypes"));
@@ -392,7 +392,7 @@ public class FrameInfoTest
         TestExceptionThrown<KeyIgnoredException, IgnoredKeyTick, int>();
     }
 
-    public class MultiKeysTick : IFrame<int>
+    public class MultiKeysTick
     {
         public int Int1;
         [Key]
@@ -407,7 +407,7 @@ public class FrameInfoTest
         TestExceptionThrown<AmbiguousKeyException, MultiKeysTick, int>();
     }
 
-    public class KeyTypeMismatchT : IFrame<uint>
+    public class KeyTypeMismatchT
     {
         public int Int1;
         [Key]
@@ -421,7 +421,7 @@ public class FrameInfoTest
         TestExceptionThrown<KeyTypeMismatchException, KeyTypeMismatchT, uint>();
     }
 
-    public class KeyUndefinedTick : IFrame<uint>
+    public class KeyUndefinedTick
     {
         public int Int1;
         public int Int2;
@@ -434,7 +434,7 @@ public class FrameInfoTest
         TestExceptionThrown<KeyUndefinedException, KeyUndefinedTick, uint>();
     }
 
-    public class LongFieldNameT : IFrame<uint>
+    public class LongFieldNameT
     {
         public int ShortInt;
         public int VeryLongFieldName;
@@ -446,7 +446,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldNameTooLongException, LongFieldNameT, uint>();
     }
 
-    public class NoFieldsTick : IFrame<uint>
+    public class NoFieldsTick
     {
         [Ignore]
         public int Int1;
@@ -462,7 +462,7 @@ public class FrameInfoTest
         TestExceptionThrown<NoFieldsException, NoFieldsTick, uint>();
     }
 
-    public class TooManyFieldsT : IFrame<int>
+    public class TooManyFieldsT
     {
         public int Int0;
         public int Int1;
@@ -489,14 +489,14 @@ public class FrameInfoTest
         TestExceptionThrown<TooManyFieldsException, TooManyFieldsT, int>();
     }
 
-    public class LenOutOfRangeT : IFrame<int>
+    public class LenOutOfRangeT
     {
         public int Int0;
         [Length(256)]
         public string? Str;
     }
 
-    public class LenOutOfRangeT2 : IFrame<int>
+    public class LenOutOfRangeT2
     {
         public int Int0;
         [Length(0)]
@@ -510,7 +510,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldLengthOutOfRangeException, LenOutOfRangeT2, int>();
     }
 
-    public class LengthUndefinedT : IFrame<int>
+    public class LengthUndefinedT
     {
         public int Int0;
         public string? Str;
@@ -522,7 +522,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldLengthUndefinedException, LengthUndefinedT, int>();
     }
 
-    public class LenNotAllowedT : IFrame<int>
+    public class LenNotAllowedT
     {
         [Length(3)]
         public int Int0;
@@ -536,7 +536,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldLengthNotAllowedException, LenNotAllowedT, int>();
     }
 
-    public class FrameTypeNameTooLongTick : IFrame<int>
+    public class FrameTypeNameTooLongTick
     {
         public int Int0;
         [Length(3)]
@@ -549,7 +549,7 @@ public class FrameInfoTest
         TestExceptionThrown<FrameTypeNameTooLongException, FrameTypeNameTooLongTick, int>();
     }
 
-    public class ArrayFieldT : IFrame<int>
+    public class ArrayFieldT
     {
         public int Int0;
         [Length(3)]
@@ -557,7 +557,7 @@ public class FrameInfoTest
         public byte[]? Bytes;
     }
 
-    public class SubclassFieldT : IFrame<int>
+    public class SubclassFieldT
     {
         public int Int0;
         [Length(3)]
@@ -566,7 +566,7 @@ public class FrameInfoTest
         public Subclass? Sub;
     }
 
-    public class ListFieldT : IFrame<int>
+    public class ListFieldT
     {
         public int Int0;
         [Length(3)]
@@ -574,7 +574,7 @@ public class FrameInfoTest
         public List<int>? List;
     }
 
-    public class TupleFieldT : IFrame<int>
+    public class TupleFieldT
     {
         public int Int0;
         [Length(3)]
@@ -582,7 +582,7 @@ public class FrameInfoTest
         public (int, int)? List;
     }
 
-    public class NullableFieldT : IFrame<int>
+    public class NullableFieldT
     {
         public int Int0;
         [Length(3)]
@@ -600,7 +600,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldTypeNotSupportedException, NullableFieldT, int>();
     }
 
-    public class Tick1 : IFrame<int>
+    public class Tick1
     {
         public int Int0;
         [Length(3)]
@@ -608,7 +608,7 @@ public class FrameInfoTest
         public int Int1;
     }
 
-    public class Tick2 : IFrame<int>
+    public class Tick2
     {
         public int Int0;
         [Length(3)]
@@ -628,7 +628,7 @@ public class FrameInfoTest
         File.Delete(temp);
     }
 
-    public class UnsupportedTick : IFrame<ulong>
+    public class UnsupportedTick
     {
         public ulong ULong;
         [Length(3)] // invalid

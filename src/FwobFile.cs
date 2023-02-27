@@ -15,7 +15,7 @@ namespace Mozo.Fwob;
 ///   3 Data Frames: pos 214 + StringTablePreservedLength, length FrameCount * FrameLength
 /// </summary>
 public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, IDisposable
-    where TFrame : class, IFrame<TKey>, new()
+    where TFrame : class, new()
     where TKey : struct, IComparable<TKey>
 {
     public override string Title

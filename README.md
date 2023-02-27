@@ -52,7 +52,7 @@ dotnet pack -c Release
 
 ### Define your frame data structure
 
-The data structure can be any class or record class that implements `Mozo.Fwob.Models.IFrame<TKey>`, where `TKey` is a struct type and implements `IComparable<TKey>`.
+The data structure can be any POCO class or record class with a key field (annotated or by convention the first type-matched field) defined as a struct type that implements `IComparable<TKey>`.
 
 The data structure can have fields, methods, indexers, properties, custom parameterized constructors and non-public members. But only public fields and the parameterless constructor will be accessed by the FWOB library.
 
@@ -61,7 +61,7 @@ Since the frame must be fixed-width, a field of string type must define a fixed 
 Here is an example,
 
 ```csharp
-public class StockTick : IFrame<uint>
+public class StockTick
 {
     public uint Price;
 
