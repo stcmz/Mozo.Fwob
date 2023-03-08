@@ -91,7 +91,7 @@ The library checks the schema in the initialization of either an `FwobFile<TFram
 ### Create an on-disk FWOB file
 
 ```csharp
-var fwobFile = FwobFile<StockTick, uint>.CreateNew(fileName, "FileTitle");
+var fwobFile = new FwobFile<StockTick, uint>(fileName, "FileTitle");
 ```
 
 ### Open an existing on-disk FWOB file
@@ -115,20 +115,26 @@ var firstFrame = fwobFile.FirstFrame;
 // Get the last frame in the file
 var lastFrame = fwobFile.LastFrame;
 
-// Get the first frame of a given key in the file
-var frame = fwobFile.GetFrame(key);
+// Get the frame of a given index in the file
+var frame = fwobFile.GetFrameAt(index);
 
-// Get an enumerator for iterating the frames of a given key in the file, in case the key is not unique
+// Get an enumerator for iterating the frames of a given key in the file
 var frames = fwobFile.GetFrames(key);
 
+// Get an enumerator for iterating the frames of a given increasing sequence of keys in the file
+var frames = fwobFile.GetFrames(key1, key2, key3);
+
 // Get an enumerator for iterating the frames of a given key range [firstKey, lastKey) in the file
-var frames = fwobFile.GetFrames(firstKey, lastKey);
+var frames = fwobFile.GetFramesBetween(firstKey, lastKey);
+
+// Get an enumerator for iterating the frames of a given higher bound (inclusive) in the file
+var frames = fwobFile.GetFramesBefore(lastKey);
 
 // Get an enumerator for iterating the frames of a given lower bound (inclusive) in the file
 var frames = fwobFile.GetFramesAfter(firstKey);
 
-// Get an enumerator for iterating the frames of a given higher bound (inclusive) in the file
-var frames = fwobFile.GetFramesBefore(lastKey);
+// Get an enumerator for iterating all the frames in the file
+var frames = fwobFile.GetAllFrames();
 ```
 
 ### Write frames
@@ -144,14 +150,23 @@ long appendedCount = fwobFile.AppendFramesTx(frames);
 ### Delete frames
 
 ```csharp
-// Deletes all frames whose key is greater than or equal to the given key
-long deletedCount = fwobFile.DeleteFramesAfter(firstKey);
+// Deletes the frames whose key is equal to the given key
+long deletedCount = fwobFile.DeleteFrames(key);
 
-// Deletes all frames whose key is less than or equal to the given key
+// Deletes the frames whose key is equal to any in the given increasing sequence of keys
+long deletedCount = fwobFile.DeleteFrames(key1, key2, key3);
+
+// Deletes the frames whose key is in a given key range [firstKey, lastKey)
+long deletedCount = fwobFile.GetFramesBetween(firstKey, lastKey);
+
+// Deletes the frames whose key is less than or equal to the given key
 long deletedCount = fwobFile.DeleteFramesBefore(lastKey);
 
+// Deletes the frames whose key is greater than or equal to the given key
+long deletedCount = fwobFile.DeleteFramesAfter(firstKey);
+
 // Deletes all frames from the storage
-fwobFile.ClearFrames();
+long deletedCount = fwobFile.DeleteAllFrames();
 ```
 
 ### String table
@@ -177,5 +192,5 @@ int index = fwobFile.AppendString(str);
 bool exist = fwobFile.ContainsString(str);
 
 // Remove all strings from the string table
-fwobFile.ClearStrings();
+int deletedCount = fwobFile.DeleteAllStrings();
 ```
