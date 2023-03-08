@@ -8,7 +8,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Authors>Maozi Chen</Authors>
     <Company>imozo studio</Company>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <PackageProjectUrl>https://github.com/stcmz/Mozo.Fwob</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/stcmz/Mozo.Fwob.git</RepositoryUrl>
