@@ -1,19 +1,14 @@
 ﻿using Mozo.Fwob.Exceptions;
-using Mozo.Fwob.Header;
-using Mozo.Fwob.Models;
+using Mozo.Fwob.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Text;
 
 namespace Mozo.Fwob;
 
-/// <summary>
-/// The implementation of interface <see cref="IStringTable"/>.
-/// </summary>
-/// <typeparam name="TFrame"></typeparam>
-/// <typeparam name="TKey"></typeparam>
+// The implementation of interface IStringTable.
 public partial class FwobFile<TFrame, TKey>
 {
     private bool _isStringTableLoaded = false;
@@ -22,29 +17,25 @@ public partial class FwobFile<TFrame, TKey>
 
     public void LoadStringTable()
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Read);
 
         if (_isStringTableLoaded)
             return;
 
-        using BinaryReader br = new(Stream, Encoding.UTF8, true);
-
-        Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
-        br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+        _br!.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
 
         List<string> list = new();
         Dictionary<string, int> dict = new();
 
         for (int i = 0; i < Header.StringCount; i++)
         {
-            string str = br.ReadString();
+            string str = _br.ReadString();
             dict[str] = list.Count;
             list.Add(str);
         }
 
-        if (br.BaseStream.Position != Header.StringTableEnding)
-            throw new CorruptedStringTableLengthException(FilePath!, Header.StringTableLength, br.BaseStream.Position - FwobHeader.HeaderLength);
+        if (_br.BaseStream.Position != Header.StringTableEnding)
+            throw new CorruptedStringTableLengthException(FilePath!, Header.StringTableLength, _br.BaseStream.Position - FwobHeader.HeaderLength);
 
         _strings = list;
         _stringDict = dict;
@@ -70,6 +61,7 @@ public partial class FwobFile<TFrame, TKey>
         {
             if (Stream == null)
                 throw new FileNotOpenedException();
+
             return _strings;
         }
     }
@@ -90,21 +82,15 @@ public partial class FwobFile<TFrame, TKey>
 
     private IEnumerable<(int index, string str)> LookupStringInFile()
     {
-        Debug.Assert(Stream != null);
-
-        using BinaryReader br = new(Stream, Encoding.UTF8, true);
-
-        Debug.Assert(br.BaseStream.Length >= Header.FirstFramePosition);
-        br.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+        _br!.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
 
         for (int i = 0; i < Header.StringCount; i++)
-            yield return (i, br.ReadString());
+            yield return (i, _br.ReadString());
     }
 
     public override string? GetString(int index)
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Read);
 
         if (index < 0 || index >= Header.StringCount)
             throw new ArgumentOutOfRangeException(nameof(index));
@@ -121,8 +107,7 @@ public partial class FwobFile<TFrame, TKey>
 
     public override int GetIndex(string str)
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Read);
 
         if (str == null)
             throw new ArgumentNullException(nameof(str));
@@ -137,17 +122,41 @@ public partial class FwobFile<TFrame, TKey>
         return -1;
     }
 
+    private void WriteStringTable(IReadOnlyList<string> strings)
+    {
+        // No string table overflow check
+        _bw!.BaseStream.Seek(Header.StringTablePosition, SeekOrigin.Begin);
+        foreach (var str in strings)
+        {
+            _bw.Write(str);
+        }
+
+        Header.StringCount = strings.Count;
+        Header.StringTableLength = (int)(_bw.BaseStream.Position - Header.StringTablePosition);
+        _bw.UpdateStringTableLength(Header);
+
+        if (_isStringTableLoaded)
+        {
+            List<string> list = new();
+            Dictionary<string, int> dict = new();
+
+            for (int i = 0; i < strings.Count; i++)
+            {
+                dict[strings[i]] = i;
+                list.Add(strings[i]);
+            }
+
+            _strings = list;
+            _stringDict = dict;
+        }
+    }
+
     public override int AppendString(string str)
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Write);
 
         if (str == null)
             throw new ArgumentNullException(nameof(str));
-
-        int index = GetIndex(str);
-        if (index != -1)
-            return index;
 
         int bytes = Encoding.UTF8.GetByteCount(str);
         int length = bytes < 128 ? 1 : bytes < 128 * 128 ? 2 : bytes < 128 * 128 * 128 ? 3 : 4;
@@ -160,16 +169,12 @@ public partial class FwobFile<TFrame, TKey>
         if (requiredLength > Header.StringTablePreservedLength)
             throw new StringTableOutOfSpaceException(FilePath!, requiredLength, Header.StringTablePreservedLength);
 
-        using (BinaryWriter bw = new(Stream, Encoding.UTF8, true))
-        {
-            Debug.Assert(bw.BaseStream.Length >= Header.FirstFramePosition);
-            bw.BaseStream.Seek(Header.StringTableEnding, SeekOrigin.Begin);
-            bw.Write(str);
+        _bw!.BaseStream.Seek(Header.StringTableEnding, SeekOrigin.Begin);
+        _bw.Write(str);
 
-            index = Header.StringCount++;
-            Header.StringTableLength = (int)(bw.BaseStream.Position - Header.StringTablePosition);
-            bw.UpdateStringTableLength(Header);
-        }
+        int index = Header.StringCount++;
+        Header.StringTableLength = (int)(_bw.BaseStream.Position - Header.StringTablePosition);
+        _bw.UpdateStringTableLength(Header);
 
         if (_isStringTableLoaded)
         {
@@ -182,8 +187,7 @@ public partial class FwobFile<TFrame, TKey>
 
     public override bool ContainsString(string str)
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Read);
 
         if (str == null)
             throw new ArgumentNullException(nameof(str));
@@ -198,22 +202,24 @@ public partial class FwobFile<TFrame, TKey>
         return false;
     }
 
-    public override void ClearStrings()
+    public override int DeleteAllStrings()
     {
-        if (Stream == null)
-            throw new FileNotOpenedException();
+        ValidateAccess(FileAccess.Write);
 
-        using (BinaryWriter bw = new(Stream, Encoding.UTF8, true))
-        {
-            Header.StringCount = 0;
-            Header.StringTableLength = 0;
-            bw.UpdateStringTableLength(Header);
-        }
+        int len = Header.StringCount;
+        if (len == 0)
+            return 0;
+
+        Header.StringCount = 0;
+        Header.StringTableLength = 0;
+        _bw!.UpdateStringTableLength(Header);
 
         if (_isStringTableLoaded)
         {
             _stringDict.Clear();
             _strings.Clear();
         }
+
+        return len;
     }
 }

@@ -1,9 +1,9 @@
-﻿using Mozo.Fwob.Models;
+﻿using Mozo.Fwob.Abstraction;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace Mozo.Fwob.Header;
+namespace Mozo.Fwob.Extensions;
 
 public static class FwobHeaderWriter
 {
@@ -22,15 +22,15 @@ public static class FwobHeaderWriter
         //*********************** Descriptors of Fields (153 bytes) ************************//
 
         // pos 5: 1 byte (allow up to 16 fields)
-        Debug.Assert(header.FieldCount <= FwobLimits.MaxFields);
+        Debug.Assert(header.FieldCount <= Limits.MaxFields);
         bw.Write(header.FieldCount);
 
         // pos 6: 16 bytes (allow up to 16 fields)
         Debug.Assert(header.FieldLengths.Length == header.FieldCount);
         bw.Write(header.FieldLengths);
 
-        if (header.FieldLengths.Length < FwobLimits.MaxFields)
-            bw.Write(new byte[FwobLimits.MaxFields - header.FieldLengths.Length]);
+        if (header.FieldLengths.Length < Limits.MaxFields)
+            bw.Write(new byte[Limits.MaxFields - header.FieldLengths.Length]);
 
         // pos 22: 8 bytes (up to 16 types, each has 4 bits, up to 16 types defined on FieldType)
         bw.Write(header.FieldTypes);
@@ -41,12 +41,12 @@ public static class FwobHeaderWriter
         for (int i = 0; i < header.FieldCount; i++)
         {
             Debug.Assert(!string.IsNullOrWhiteSpace(header.FieldNames[i]));
-            Debug.Assert(header.FieldNames[i].Length <= FwobLimits.MaxFieldNameLength);
-            bw.Write(header.FieldNames[i].PadRight(FwobLimits.MaxFieldNameLength).ToCharArray());
+            Debug.Assert(header.FieldNames[i].Length <= Limits.MaxFieldNameLength);
+            bw.Write(header.FieldNames[i].PadRight(Limits.MaxFieldNameLength).ToCharArray());
         }
 
-        if (header.FieldNames.Length < FwobLimits.MaxFields)
-            bw.Write(new byte[(FwobLimits.MaxFields - header.FieldNames.Length) * FwobLimits.MaxFieldNameLength]);
+        if (header.FieldNames.Length < Limits.MaxFields)
+            bw.Write(new byte[(Limits.MaxFields - header.FieldNames.Length) * Limits.MaxFieldNameLength]);
 
         //*********************** Size of String Tables (12 bytes) ************************//
 
@@ -74,13 +74,13 @@ public static class FwobHeaderWriter
 
         // pos 182: 16 bytes (up to 16 chars)
         Debug.Assert(!string.IsNullOrWhiteSpace(header.FrameType));
-        Debug.Assert(header.FrameType.Length <= FwobLimits.MaxFrameTypeLength);
-        bw.Write(header.FrameType.PadRight(FwobLimits.MaxFrameTypeLength).ToCharArray());
+        Debug.Assert(header.FrameType.Length <= Limits.MaxFrameTypeLength);
+        bw.Write(header.FrameType.PadRight(Limits.MaxFrameTypeLength).ToCharArray());
 
         // pos 198: 16 bytes (up to 16 chars)
         Debug.Assert(!string.IsNullOrWhiteSpace(header.Title));
-        Debug.Assert(header.Title.Length <= FwobLimits.MaxTitleLength);
-        bw.Write(header.Title.PadRight(FwobLimits.MaxTitleLength).ToCharArray());
+        Debug.Assert(header.Title.Length <= Limits.MaxTitleLength);
+        bw.Write(header.Title.PadRight(Limits.MaxTitleLength).ToCharArray());
     }
 
     public static void UpdateTitle(this BinaryWriter bw, FwobHeader header)
@@ -89,8 +89,8 @@ public static class FwobHeaderWriter
 
         // pos 198: 16 bytes (up to 16 chars)
         Debug.Assert(!string.IsNullOrWhiteSpace(header.Title));
-        Debug.Assert(header.Title.Length <= FwobLimits.MaxTitleLength);
-        bw.Write(header.Title.PadRight(FwobLimits.MaxTitleLength).ToCharArray());
+        Debug.Assert(header.Title.Length <= Limits.MaxTitleLength);
+        bw.Write(header.Title.PadRight(Limits.MaxTitleLength).ToCharArray());
     }
 
     public static void UpdateFrameCount(this BinaryWriter bw, FwobHeader header)

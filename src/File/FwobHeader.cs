@@ -1,12 +1,12 @@
 ﻿using Mozo.Fwob.Exceptions;
-using Mozo.Fwob.Models;
+using Mozo.Fwob.Abstraction;
 using System;
 using System.Linq;
 
-namespace Mozo.Fwob.Header;
+namespace Mozo.Fwob;
 
 //*********************** Total Header Size (214 bytes) ************************//
-public class FwobHeader
+public sealed class FwobHeader
 {
     public const int CurrentVersion = 1;
     public const int HeaderLength = 214;
@@ -26,13 +26,13 @@ public class FwobHeader
     public byte FieldCount { get; set; }
 
     // pos 6: 16 bytes (allow up to 16 fields)
-    public byte[] FieldLengths { get; set; } = Array.Empty<byte>();
+    public byte[] FieldLengths { get; set; }
 
     // pos 22: 8 bytes (up to 16 types, each has 3 bits, up to 8 types defined on FieldType)
     public ulong FieldTypes { get; set; }
 
     // pos 30: 128 bytes (allow up to 16*8 chars)
-    public string[] FieldNames { get; set; } = Array.Empty<string>();
+    public string[] FieldNames { get; set; }
 
     //*********************** Size of String Tables (12 bytes) ************************//
 
@@ -54,10 +54,10 @@ public class FwobHeader
     public int FrameLength { get; set; }
 
     // pos 182: 16 bytes (up to 16 chars)
-    public string FrameType { get; set; } = string.Empty;
+    public string FrameType { get; set; }
 
     // pos 198: 16 bytes (up to 16 chars)
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; }
 
     public long StringTablePosition => HeaderLength;
 
@@ -69,64 +69,66 @@ public class FwobHeader
 
     public long FileLength => StringTablePosition + StringTablePreservedLength + FrameLength * FrameCount;
 
-    public static FwobHeader CreateNew<TFrame, TKey>(string title)
+    public FwobHeader()
     {
-        if (string.IsNullOrEmpty(title))
-            throw new ArgumentNullException(nameof(title), "Argument should not be null or empty");
-
-        if (title.Length > FwobLimits.MaxTitleLength)
-            throw new TitleTooLongException(title, title.Length);
-
-        Type frameType = typeof(TFrame);
-
-        var frameInfo = FrameInfo.FromSystem(frameType, typeof(TKey));
-
-        var header = new FwobHeader
-        {
-            // "FWOB": Signature
-            Version = CurrentVersion,
-
-            FieldCount = (byte)frameInfo.Fields.Count,
-            FieldLengths = frameInfo.Fields.Select(o => (byte)o.FieldLength).ToArray(),
-            FieldTypes = frameInfo.FieldTypes,
-            FieldNames = frameInfo.Fields.Select(o => o.FieldName).ToArray(),
-
-            StringCount = 0,
-            StringTableLength = 0,
-            StringTablePreservedLength = DefaultStringTablePreservedLength,
-
-            FrameCount = 0,
-            FrameLength = frameInfo.FrameLength,
-            FrameType = frameType.Name,
-            Title = title,
-        };
-
-        return header;
+        FieldNames = Array.Empty<string>();
+        FieldLengths = Array.Empty<byte>();
+        FrameType = string.Empty;
+        Title = string.Empty;
     }
 
-    public FrameInfo? GetFrameInfo<TFrame, TKey>()
+    public FwobHeader(FrameInfo frameInfo, string title, int preservedStringTableLength)
     {
-        var frameInfo = FrameInfo.FromSystem<TFrame, TKey>();
+        if (title == null)
+            throw new ArgumentNullException(nameof(title), "Argument should not be null");
 
+        title = title.Trim();
+
+        if (title.Length == 0)
+            throw new ArgumentException("Argument should not be empty or white space", nameof(title));
+
+        if (title.Length > Limits.MaxTitleLength)
+            throw new TitleTooLongException(title, title.Length);
+
+        // "FWOB": Signature
+        Version = CurrentVersion;
+
+        FieldCount = (byte)frameInfo.Fields.Count;
+        FieldLengths = frameInfo.Fields.Select(o => (byte)o.FieldLength).ToArray();
+        FieldTypes = frameInfo.FieldTypes;
+        FieldNames = frameInfo.Fields.Select(o => o.FieldName).ToArray();
+
+        StringCount = 0;
+        StringTableLength = 0;
+        StringTablePreservedLength = preservedStringTableLength;
+
+        FrameCount = 0;
+        FrameLength = frameInfo.FrameLength;
+        FrameType = frameInfo.FrameType;
+        Title = title;
+    }
+
+    public bool Validate(FrameInfo frameInfo)
+    {
         if (FrameType != frameInfo.FrameType)
-            return null;
+            return false;
         if (FrameLength != frameInfo.FrameLength)
-            return null;
+            return false;
 
         if (FieldCount != frameInfo.Fields.Count)
-            return null;
+            return false;
         if (FieldTypes != frameInfo.FieldTypes)
-            return null;
+            return false;
 
         for (int i = 0; i < frameInfo.Fields.Count; i++)
         {
-            FieldInfo fi = frameInfo.Fields[i];
-            if (FieldLengths[i] != fi.FieldLength)
-                return null;
-            if (FieldNames[i] != fi.FieldName)
-                return null;
+            FieldInfo fieldInfo = frameInfo.Fields[i];
+            if (FieldLengths[i] != fieldInfo.FieldLength)
+                return false;
+            if (FieldNames[i] != fieldInfo.FieldName)
+                return false;
         }
 
-        return frameInfo;
+        return true;
     }
 }

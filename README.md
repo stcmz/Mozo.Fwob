@@ -24,7 +24,7 @@ This repository contains the library implementation of the FWOB file format.
 * Frame type: up to 16 fields
 * Field name: up to 8 bytes
 * Field type: of any primitive types (non-nullable) and string type
-* String length: up to 255 bytes
+* String field length: up to 255 bytes
 
 ## Build from source
 
@@ -170,7 +170,7 @@ var str = fwobFile.GetString(index);
 // Get a specific index of a given string
 int index = fwobFile.GetString(str);
 
-// Append a string to the string table if not exist
+// Append a string to the back of the string table (duplicate allowed)
 int index = fwobFile.AppendString(str);
 
 // Check if a string is in the string table

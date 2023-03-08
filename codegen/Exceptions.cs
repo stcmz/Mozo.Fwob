@@ -34,6 +34,8 @@ internal class ExceptionGenerator : ISourceGenerator
 
             /* Access: File Access Related Exceptions */
             "FileNotOpened", // The file object does not contain any opened file
+            "FileNotReadable", // The file object was opened without FileAccess.Read
+            "FileNotWritable", // The file object was opened without FileAccess.Write
             "CorruptedFileHeader|string FileName", // A unrecognized file header that does not in FWOB format
             "FrameTypeMismatch|string FileName|Type FrameType", // A frame type that does not precisely match the file schema
             "CorruptedFileLength|string FileName|long FileLength|long ActualLength", // The file length stored in header differs from actual length in stream

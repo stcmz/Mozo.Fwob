@@ -1,8 +1,8 @@
-﻿using Mozo.Fwob.Models;
+﻿using Mozo.Fwob.Abstraction;
 using System.IO;
 using System.Linq;
 
-namespace Mozo.Fwob.Header;
+namespace Mozo.Fwob.Extensions;
 
 public static class FwobHeaderReader
 {
@@ -33,20 +33,20 @@ public static class FwobHeaderReader
         // pos 5: 1 byte (allow up to 16 fields)
         header.FieldCount = br.ReadByte();
 
-        if (header.FieldCount > FwobLimits.MaxFields)
+        if (header.FieldCount > Limits.MaxFields)
             return null;
 
         // pos 6: 16 bytes (allow up to 16 fields)
-        header.FieldLengths = br.ReadBytes(FwobLimits.MaxFields);
+        header.FieldLengths = br.ReadBytes(Limits.MaxFields);
 
         // pos 22: 8 bytes (up to 16 types, each has 4 bits, up to 16 types defined on FieldType)
         header.FieldTypes = br.ReadUInt64();
 
         // pos 30: 128 bytes (allow up to 16*8 chars)
-        header.FieldNames = new string[FwobLimits.MaxFields];
-        for (int i = 0; i < FwobLimits.MaxFields; i++)
+        header.FieldNames = new string[Limits.MaxFields];
+        for (int i = 0; i < Limits.MaxFields; i++)
         {
-            header.FieldNames[i] = new string(br.ReadChars(FwobLimits.MaxFieldNameLength)).Trim();
+            header.FieldNames[i] = new string(br.ReadChars(Limits.MaxFieldNameLength)).Trim();
             if (i < header.FieldCount && header.FieldNames[i].Length == 0)
                 return null;
         }
@@ -86,13 +86,13 @@ public static class FwobHeaderReader
             return null;
 
         // pos 182: 16 bytes (up to 16 chars)
-        header.FrameType = new string(br.ReadChars(FwobLimits.MaxFrameTypeLength)).Trim();
+        header.FrameType = new string(br.ReadChars(Limits.MaxFrameTypeLength)).Trim();
 
         if (header.FrameType.Length == 0)
             return null;
 
         // pos 198: 16 bytes (up to 16 chars)
-        header.Title = new string(br.ReadChars(FwobLimits.MaxTitleLength)).Trim();
+        header.Title = new string(br.ReadChars(Limits.MaxTitleLength)).Trim();
 
         if (header.Title.Length == 0)
             return null;

@@ -1,6 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Mozo.Fwob.Abstraction;
 using Mozo.Fwob.Exceptions;
-using Mozo.Fwob.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,6 +28,7 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
     public class TypedTickWithKey
@@ -49,6 +50,7 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
     public class TypedTickFloat
@@ -69,6 +71,7 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
     public class FloatWithKeyTick
@@ -90,143 +93,113 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
-    private void ValidateFrameInfo<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
+    private static void ValidateFrameInfo<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
         where TFrame : class, new()
         where TKey : struct, IComparable<TKey>
     {
-        Assert.IsTrue(file.FrameInfo.FrameLength == 59);
-        Assert.IsTrue(file.FrameInfo.FieldTypes == 0x4430100212011ul);
-        Assert.IsTrue(file.FrameInfo.Fields.Count == 13);
+        Assert.AreEqual(75, file.FrameInfo.FrameLength);
+        Assert.AreEqual(0x24430100212011ul, file.FrameInfo.FieldTypes);
+        Assert.AreEqual(14, file.FrameInfo.Fields.Count);
 
-        for (int i = 0; i < 13; i++)
+        for (int i = 0; i < 14; i++)
         {
             Assert.AreEqual(file.FrameInfo.Fields[i].IsKey, (keyIndex == i));
         }
-        Assert.AreEqual(file.FrameInfo.KeyIndex, keyIndex);
+        Assert.AreEqual(file.FrameInfo.KeyFieldIndex, keyIndex);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldLength == 8);
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldLength == 4);
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldLength == 4);
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldLength == 4);
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldLength == 1);
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldLength == 8);
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldLength == 1);
-        Assert.IsTrue(file.FrameInfo.Fields[7].FieldLength == 2);
-        Assert.IsTrue(file.FrameInfo.Fields[8].FieldLength == 2);
-        Assert.IsTrue(file.FrameInfo.Fields[9].FieldLength == 8);
-        Assert.IsTrue(file.FrameInfo.Fields[10].FieldLength == 5);
-        Assert.IsTrue(file.FrameInfo.Fields[11].FieldLength == 4);
-        Assert.IsTrue(file.FrameInfo.Fields[12].FieldLength == 8);
+        Assert.AreEqual(8, file.FrameInfo.Fields[0].FieldLength);
+        Assert.AreEqual(4, file.FrameInfo.Fields[1].FieldLength);
+        Assert.AreEqual(4, file.FrameInfo.Fields[2].FieldLength);
+        Assert.AreEqual(4, file.FrameInfo.Fields[3].FieldLength);
+        Assert.AreEqual(1, file.FrameInfo.Fields[4].FieldLength);
+        Assert.AreEqual(8, file.FrameInfo.Fields[5].FieldLength);
+        Assert.AreEqual(1, file.FrameInfo.Fields[6].FieldLength);
+        Assert.AreEqual(2, file.FrameInfo.Fields[7].FieldLength);
+        Assert.AreEqual(2, file.FrameInfo.Fields[8].FieldLength);
+        Assert.AreEqual(8, file.FrameInfo.Fields[9].FieldLength);
+        Assert.AreEqual(5, file.FrameInfo.Fields[10].FieldLength);
+        Assert.AreEqual(4, file.FrameInfo.Fields[11].FieldLength);
+        Assert.AreEqual(8, file.FrameInfo.Fields[12].FieldLength);
+        Assert.AreEqual(16, file.FrameInfo.Fields[13].FieldLength);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldName == "ULong");
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldName == "UInt");
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldName == "Int");
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldName == "Float");
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldName == "b");
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldName == "Value");
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldName == "sb");
-        Assert.IsTrue(file.FrameInfo.Fields[7].FieldName == "sh");
-        Assert.IsTrue(file.FrameInfo.Fields[8].FieldName == "ush");
-        Assert.IsTrue(file.FrameInfo.Fields[9].FieldName == "VeryLong");
-        Assert.IsTrue(file.FrameInfo.Fields[10].FieldName == "Str");
-        Assert.IsTrue(file.FrameInfo.Fields[11].FieldName == "Idx");
-        Assert.IsTrue(file.FrameInfo.Fields[12].FieldName == "Index");
+        Assert.AreEqual("ULong", file.FrameInfo.Fields[0].FieldName);
+        Assert.AreEqual("UInt", file.FrameInfo.Fields[1].FieldName);
+        Assert.AreEqual("Int", file.FrameInfo.Fields[2].FieldName);
+        Assert.AreEqual("Float", file.FrameInfo.Fields[3].FieldName);
+        Assert.AreEqual("b", file.FrameInfo.Fields[4].FieldName);
+        Assert.AreEqual("Value", file.FrameInfo.Fields[5].FieldName);
+        Assert.AreEqual("sb", file.FrameInfo.Fields[6].FieldName);
+        Assert.AreEqual("sh", file.FrameInfo.Fields[7].FieldName);
+        Assert.AreEqual("ush", file.FrameInfo.Fields[8].FieldName);
+        Assert.AreEqual("VeryLong", file.FrameInfo.Fields[9].FieldName);
+        Assert.AreEqual("Str", file.FrameInfo.Fields[10].FieldName);
+        Assert.AreEqual("Idx", file.FrameInfo.Fields[11].FieldName);
+        Assert.AreEqual("Index", file.FrameInfo.Fields[12].FieldName);
+        Assert.AreEqual("Dec", file.FrameInfo.Fields[13].FieldName);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldType == FieldType.FloatingPoint);
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldType == FieldType.FloatingPoint);
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[7].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[8].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[9].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[10].FieldType == FieldType.Utf8String);
-        Assert.IsTrue(file.FrameInfo.Fields[11].FieldType == FieldType.StringTableIndex);
-        Assert.IsTrue(file.FrameInfo.Fields[12].FieldType == FieldType.StringTableIndex);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[0].FieldType);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[1].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[2].FieldType);
+        Assert.AreEqual(FieldType.FloatingPoint, file.FrameInfo.Fields[3].FieldType);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[4].FieldType);
+        Assert.AreEqual(FieldType.FloatingPoint, file.FrameInfo.Fields[5].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[6].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[7].FieldType);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[8].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[9].FieldType);
+        Assert.AreEqual(FieldType.Utf8String, file.FrameInfo.Fields[10].FieldType);
+        Assert.AreEqual(FieldType.StringTableIndex, file.FrameInfo.Fields[11].FieldType);
+        Assert.AreEqual(FieldType.StringTableIndex, file.FrameInfo.Fields[12].FieldType);
+        Assert.AreEqual(FieldType.FloatingPoint, file.FrameInfo.Fields[13].FieldType);
+
+        Assert.IsNull(file.GetKeyAt(0));
+        var frame = new TFrame();
+        file.AppendFrames(frame);
+        Assert.AreEqual(0, file.GetKeyAt(0)?.CompareTo(AbstractFwobFile<TFrame, TKey>.GetKey(frame)));
     }
 
-    [TestMethod]
-    public void TestSupportedTypesInMemory()
+    private static void TestSupportedTypes<TFrame, TKey>(int keyIndex)
+        where TFrame : class, new()
+        where TKey : struct, IComparable<TKey>
     {
-        var file = new InMemoryFwobFile<TypedTick, ulong>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "TypedTick");
-        ValidateFrameInfo(file, 0);
-    }
+        InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
+        Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
+        ValidateFrameInfo(memfile, keyIndex);
 
-    [TestMethod]
-    public void TestSupportedTypesInFile()
-    {
         string temp = Path.GetTempFileName();
-        using (var file = FwobFile<TypedTick, ulong>.CreateNew(temp, "TestTypes", FileMode.Open))
+        using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
-            Assert.IsTrue(file.FrameInfo.FrameType == "TypedTick");
-            ValidateFrameInfo(file, 0);
+            Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
+            ValidateFrameInfo(file, keyIndex);
         }
         File.Delete(temp);
     }
 
     [TestMethod]
-    public void TestSupportedTypesWithKeyInMemory()
+    public void TestSupportedTypes()
     {
-        var file = new InMemoryFwobFile<TypedTickWithKey, ulong>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "TypedTickWithKey");
-        ValidateFrameInfo(file, 0);
+        TestSupportedTypes<TypedTick, ulong>(0);
     }
 
     [TestMethod]
-    public void TestSupportedTypesWithKeyInFile()
+    public void TestSupportedTypesWithKey()
     {
-        string temp = Path.GetTempFileName();
-        using (var file = FwobFile<TypedTickWithKey, ulong>.CreateNew(temp, "TestTypes", FileMode.Open))
-        {
-            Assert.IsTrue(file.FrameInfo.FrameType == "TypedTickWithKey");
-            ValidateFrameInfo(file, 0);
-        }
-        File.Delete(temp);
+        TestSupportedTypes<TypedTickWithKey, ulong>(0);
     }
 
     [TestMethod]
-    public void TestSupportedTypesFloatInMemory()
+    public void TestSupportedTypesFloat()
     {
-        var file = new InMemoryFwobFile<TypedTickFloat, float>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "TypedTickFloat");
-        ValidateFrameInfo(file, 3);
+        TestSupportedTypes<TypedTickFloat, float>(3);
     }
 
     [TestMethod]
-    public void TestSupportedTypesFloatInFile()
+    public void TestSupportedTypesFloatWithKey()
     {
-        string temp = Path.GetTempFileName();
-        using (var file = FwobFile<TypedTickFloat, float>.CreateNew(temp, "TestTypes", FileMode.Open))
-        {
-            Assert.IsTrue(file.FrameInfo.FrameType == "TypedTickFloat");
-            ValidateFrameInfo(file, 3);
-        }
-        File.Delete(temp);
-    }
-
-    [TestMethod]
-    public void TestSupportedTypesFloatWithKeyInMemory()
-    {
-        var file = new InMemoryFwobFile<FloatWithKeyTick, float>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "FloatWithKeyTick");
-        ValidateFrameInfo(file, 3);
-    }
-
-    [TestMethod]
-    public void TestSupportedTypesFloatWithKeyInFile()
-    {
-        string temp = Path.GetTempFileName();
-        using (var file = FwobFile<FloatWithKeyTick, float>.CreateNew(temp, "TestTypes", FileMode.Open))
-        {
-            Assert.IsTrue(file.FrameInfo.FrameType == "FloatWithKeyTick");
-            ValidateFrameInfo(file, 3);
-        }
-        File.Delete(temp);
+        TestSupportedTypes<FloatWithKeyTick, float>(3);
     }
 
     public class IgnoredTick
@@ -253,6 +226,7 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
     public class IgnoredTickKey
@@ -280,85 +254,83 @@ public class FrameInfoTest
         public int Idx;
         [StringTableIndex]
         public long Index;
+        public decimal Dec;
     }
 
-    private void ValidateFrameInfoIgnored<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
+    private static void ValidateFrameInfoIgnored<TFrame, TKey>(AbstractFwobFile<TFrame, TKey> file, int keyIndex)
         where TFrame : class, new()
         where TKey : struct, IComparable<TKey>
     {
-        Assert.IsTrue(file.FrameInfo.FrameLength == 29);
-        Assert.IsTrue(file.FrameInfo.FieldTypes == 0x4310101ul);
-        Assert.IsTrue(file.FrameInfo.Fields.Count == 7);
+        Assert.AreEqual(45, file.FrameInfo.FrameLength);
+        Assert.AreEqual(0x24310101ul, file.FrameInfo.FieldTypes);
+        Assert.AreEqual(8, file.FrameInfo.Fields.Count);
 
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 8; i++)
         {
             Assert.AreEqual(file.FrameInfo.Fields[i].IsKey, (keyIndex == i));
         }
-        Assert.AreEqual(file.FrameInfo.KeyIndex, keyIndex);
+        Assert.AreEqual(file.FrameInfo.KeyFieldIndex, keyIndex);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldLength == 8);
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldLength == 4);
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldLength == 1);
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldLength == 1);
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldLength == 2);
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldLength == 5);
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldLength == 8);
+        Assert.AreEqual(8, file.FrameInfo.Fields[0].FieldLength);
+        Assert.AreEqual(4, file.FrameInfo.Fields[1].FieldLength);
+        Assert.AreEqual(1, file.FrameInfo.Fields[2].FieldLength);
+        Assert.AreEqual(1, file.FrameInfo.Fields[3].FieldLength);
+        Assert.AreEqual(2, file.FrameInfo.Fields[4].FieldLength);
+        Assert.AreEqual(5, file.FrameInfo.Fields[5].FieldLength);
+        Assert.AreEqual(8, file.FrameInfo.Fields[6].FieldLength);
+        Assert.AreEqual(16, file.FrameInfo.Fields[7].FieldLength);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldName == "ULong");
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldName == "Int");
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldName == "b");
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldName == "sb");
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldName == "ush");
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldName == "Str");
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldName == "Index");
+        Assert.AreEqual("ULong", file.FrameInfo.Fields[0].FieldName);
+        Assert.AreEqual("Int", file.FrameInfo.Fields[1].FieldName);
+        Assert.AreEqual("b", file.FrameInfo.Fields[2].FieldName);
+        Assert.AreEqual("sb", file.FrameInfo.Fields[3].FieldName);
+        Assert.AreEqual("ush", file.FrameInfo.Fields[4].FieldName);
+        Assert.AreEqual("Str", file.FrameInfo.Fields[5].FieldName);
+        Assert.AreEqual("Index", file.FrameInfo.Fields[6].FieldName);
+        Assert.AreEqual("Dec", file.FrameInfo.Fields[7].FieldName);
 
-        Assert.IsTrue(file.FrameInfo.Fields[0].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[1].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[2].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[3].FieldType == FieldType.SignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[4].FieldType == FieldType.UnsignedInteger);
-        Assert.IsTrue(file.FrameInfo.Fields[5].FieldType == FieldType.Utf8String);
-        Assert.IsTrue(file.FrameInfo.Fields[6].FieldType == FieldType.StringTableIndex);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[0].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[1].FieldType);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[2].FieldType);
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[3].FieldType);
+        Assert.AreEqual(FieldType.UnsignedInteger, file.FrameInfo.Fields[4].FieldType);
+        Assert.AreEqual(FieldType.Utf8String, file.FrameInfo.Fields[5].FieldType);
+        Assert.AreEqual(FieldType.StringTableIndex, file.FrameInfo.Fields[6].FieldType);
+        Assert.AreEqual(FieldType.FloatingPoint, file.FrameInfo.Fields[7].FieldType);
+
+        Assert.IsNull(file.GetKeyAt(0));
+        var frame = new TFrame();
+        file.AppendFrames(frame);
+        Assert.AreEqual(0, file.GetKeyAt(0)?.CompareTo(AbstractFwobFile<TFrame, TKey>.GetKey(frame)));
     }
 
-    [TestMethod]
-    public void TestSupportedTypesIgnoredInMemory()
+    private static void TestSupportedTypesIgnored<TFrame, TKey>(int keyIndex)
+        where TFrame : class, new()
+        where TKey : struct, IComparable<TKey>
     {
-        var file = new InMemoryFwobFile<IgnoredTick, ushort>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "IgnoredTick");
-        ValidateFrameInfoIgnored(file, 4);
-    }
+        InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
+        Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
+        ValidateFrameInfoIgnored(memfile, keyIndex);
 
-    [TestMethod]
-    public void TestSupportedTypesIgnoredInFile()
-    {
         string temp = Path.GetTempFileName();
-        using (var file = FwobFile<IgnoredTick, ushort>.CreateNew(temp, "TestTypes", FileMode.Open))
+        using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
-            Assert.IsTrue(file.FrameInfo.FrameType == "IgnoredTick");
-            ValidateFrameInfoIgnored(file, 4);
+            Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
+            ValidateFrameInfoIgnored(file, keyIndex);
         }
         File.Delete(temp);
     }
 
     [TestMethod]
-    public void TestSupportedTypesIgnoredWithKeyInMemory()
+    public void TestSupportedTypesIgnored()
     {
-        var file = new InMemoryFwobFile<IgnoredTickKey, int>("TestTypes");
-        Assert.IsTrue(file.FrameInfo.FrameType == "IgnoredTickKey");
-        ValidateFrameInfoIgnored(file, 1);
+        TestSupportedTypesIgnored<IgnoredTick, ushort>(4);
     }
 
     [TestMethod]
-    public void TestSupportedTypesIgnoredWithKeyInFile()
+    public void TestSupportedTypesIgnoredWithKey()
     {
-        string temp = Path.GetTempFileName();
-        using (var file = FwobFile<IgnoredTickKey, int>.CreateNew(temp, "TestTypes", FileMode.Open))
-        {
-            Assert.IsTrue(file.FrameInfo.FrameType == "IgnoredTickKey");
-            ValidateFrameInfoIgnored(file, 1);
-        }
-        File.Delete(temp);
+        TestSupportedTypesIgnored<IgnoredTickKey, int>(1);
     }
 
     public class IgnoredKeyTick
@@ -381,7 +353,7 @@ public class FrameInfoTest
         string temp = Path.GetTempFileName();
         Assert.ThrowsException<TException>(() =>
         {
-            using (var file = FwobFile<TFrame, TKey>.CreateNew(temp, "TestTypes", FileMode.Open)) { }
+            using FwobFile<TFrame, TKey> file = new(temp, "TestTypes");
         });
         File.Delete(temp);
     }
@@ -446,7 +418,7 @@ public class FrameInfoTest
         TestExceptionThrown<FieldNameTooLongException, LongFieldNameT, uint>();
     }
 
-    public class NoFieldsTick
+    public class NoFieldsTick1
     {
         [Ignore]
         public int Int1;
@@ -456,10 +428,15 @@ public class FrameInfoTest
         public int Int3;
     }
 
+    public class NoFieldsTick2
+    {
+    }
+
     [TestMethod]
     public void TestNoFields()
     {
-        TestExceptionThrown<NoFieldsException, NoFieldsTick, uint>();
+        TestExceptionThrown<NoFieldsException, NoFieldsTick1, uint>();
+        TestExceptionThrown<NoFieldsException, NoFieldsTick2, uint>();
     }
 
     public class TooManyFieldsT
@@ -549,6 +526,38 @@ public class FrameInfoTest
         TestExceptionThrown<FrameTypeNameTooLongException, FrameTypeNameTooLongTick, int>();
     }
 
+    public class CharFieldT
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public char Ch;
+    }
+
+    public class BoolFieldT
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public bool B;
+    }
+
+    public class NintFieldT
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public nint Nint;
+    }
+
+    public class NuintFieldT
+    {
+        public int Int0;
+        [Length(3)]
+        public string? Str;
+        public nuint Nuint;
+    }
+
     public class ArrayFieldT
     {
         public int Int0;
@@ -593,6 +602,10 @@ public class FrameInfoTest
     [TestMethod]
     public void TestFieldTypeNotSupported()
     {
+        TestExceptionThrown<FieldTypeNotSupportedException, CharFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, BoolFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, NintFieldT, int>();
+        TestExceptionThrown<FieldTypeNotSupportedException, NuintFieldT, int>();
         TestExceptionThrown<FieldTypeNotSupportedException, ArrayFieldT, int>();
         TestExceptionThrown<FieldTypeNotSupportedException, SubclassFieldT, int>();
         TestExceptionThrown<FieldTypeNotSupportedException, ListFieldT, int>();
@@ -600,48 +613,229 @@ public class FrameInfoTest
         TestExceptionThrown<FieldTypeNotSupportedException, NullableFieldT, int>();
     }
 
+    public class Tick0a
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick0b
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public int Int1;
+    }
+
     public class Tick1
     {
         public int Int0;
-        [Length(3)]
+        [Length(4)]
         public string? Str;
-        public int Int1;
+        public long Int1;
     }
 
     public class Tick2
     {
         public int Int0;
-        [Length(3)]
+        [Length(4)]
         public string? Str;
-        public int Int1;
+        public long Int1;
+    }
+
+    public class Tick3
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick4
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick5
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick6
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick7
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick8
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class Tick9
+    {
+        public int Int0;
+        [Length(4)]
+        public string? Str;
+        public long Int1;
+    }
+
+    public class TickTypes
+    {
+        // Identical
+        public class Tick0a
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public long Int1;
+        }
+
+        // Identical
+        public class Tick0b
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            [Key]
+            public int Int1;
+        }
+
+        // Reordered fields equal length
+        public class Tick1
+        {
+            public int Int0;
+            public long Int1;
+            [Length(4)]
+            public string? Str;
+        }
+
+        // Different field type equal length
+        public class Tick2
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public double Int1;
+        }
+
+        // Different key field equal length
+        public class Tick3
+        {
+            public float Int0;
+            [Length(4)]
+            public string? Str;
+            public long Int1;
+        }
+
+        // Different field name equal length
+        public class Tick4
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public long Int2;
+        }
+
+        // Different field length equal total length
+        public class Tick5
+        {
+            public int Int0;
+            [Length(8)]
+            public string? Str;
+            public int Int1;
+        }
+
+        // Extra field equal length
+        public class Tick6
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public int Int1;
+            public int Int2;
+        }
+
+        // Extra field inequal length
+        public class Tick7
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public long Int1;
+            public int Int2;
+        }
+
+        // Missing field equal length
+        public class Tick8
+        {
+            public int Int0;
+            [Length(12)]
+            public string? Str;
+        }
+
+        // Missing field inequal length
+        public class Tick9
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+        }
+    }
+
+    private static void TestFrameTypeMismatchThrown<TFrame1, TFrame2, TKey1, TKey2, TException>()
+        where TFrame1 : class, new()
+        where TFrame2 : class, new()
+        where TKey1 : struct, IComparable<TKey1>
+        where TKey2 : struct, IComparable<TKey2>
+        where TException : Exception
+    {
+        string temp = Path.GetTempFileName();
+        Assert.ThrowsException<TException>(() =>
+        {
+            using (FwobFile<TFrame1, TKey1> file = new(temp, "TestTypes")) { }
+            using (FwobFile<TFrame2, TKey2> file = new(temp)) { }
+        });
+        File.Delete(temp);
     }
 
     [TestMethod]
     public void TestFrameTypeMismatch()
     {
-        string temp = Path.GetTempFileName();
-        Assert.ThrowsException<FrameTypeMismatchException>(() =>
-        {
-            using (var file = FwobFile<Tick1, int>.CreateNew(temp, "TestTypes", FileMode.Open)) { }
-            using (var file = new FwobFile<Tick2, int>(temp)) { }
-        });
-        File.Delete(temp);
-    }
+        // TODO: Should throw exception for redefined key, will resolve in the next version
+        //TestFrameTypeMismatchThrown<Tick0a, TickTypes.Tick0a, int, long, FrameTypeMismatchException>();
+        //TestFrameTypeMismatchThrown<Tick0b, TickTypes.Tick0b, int, int, FrameTypeMismatchException>();
 
-    public class UnsupportedTick
-    {
-        public ulong ULong;
-        [Length(3)] // invalid
-        public uint UInt;
-        [StringTableIndex] // not supported
-        public double Value;
-        public string? Str; // Length missing
-        public byte[]? Bytes; // not supported
-    }
-
-    [TestMethod]
-    public void TestUnsupportedTypes()
-    {
-        //Assert.ThrowsException<Exception>(() => new InMemoryFwobFile<UnsupportedTick, ulong>("MyFwob"));
+        TestFrameTypeMismatchThrown<Tick1, Tick2, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick1, TickTypes.Tick1, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick2, TickTypes.Tick2, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick3, TickTypes.Tick3, int, float, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick4, TickTypes.Tick4, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick5, TickTypes.Tick5, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick6, TickTypes.Tick6, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick7, TickTypes.Tick7, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick8, TickTypes.Tick8, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick9, TickTypes.Tick9, int, int, FrameTypeMismatchException>();
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Mozo.Fwob.Models;
+namespace Mozo.Fwob.Abstraction;
 
 public interface IStringTable
 {
@@ -16,5 +16,5 @@ public interface IStringTable
 
     bool ContainsString(string str);
 
-    void ClearStrings();
+    int DeleteAllStrings();
 }

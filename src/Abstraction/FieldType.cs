@@ -1,4 +1,4 @@
-﻿namespace Mozo.Fwob.Models;
+﻿namespace Mozo.Fwob.Abstraction;
 
 public enum FieldType
 {
