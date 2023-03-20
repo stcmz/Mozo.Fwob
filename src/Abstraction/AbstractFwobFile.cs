@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace Mozo.Fwob.Abstraction;
 
-public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, TKey>, IStringTable
+public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, TKey>, IStringTable
     where TFrame : class, new()
     where TKey : struct, IComparable<TKey>
 
@@ -33,6 +34,20 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, T
 
         return lambda.Compile();
     }
+
+    #region Implementations of IEnumerable<TFrame>
+
+    public IEnumerator<TFrame> GetEnumerator()
+    {
+        return GetAllFrames().GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetAllFrames().GetEnumerator();
+    }
+
+    #endregion
 
     #region Abstract implementations of IFrameQueryable<TFrame, TKey>
 
@@ -165,6 +180,10 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameQueryable<TFrame, T
     public abstract IEnumerable<TFrame> GetFramesAfter(TKey firstKey);
 
     public abstract IEnumerable<TFrame> GetAllFrames();
+
+    #endregion
+
+    #region Abstract implementations of IFrameCollection<TFrame, TKey>
 
     public long AppendFrames(params TFrame[] frames) => AppendFrames((IEnumerable<TFrame>)frames);
 

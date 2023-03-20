@@ -424,6 +424,8 @@ public class FwobFileTest
         Assert.IsFalse(file.GetFramesAfter(1000).Any());
 
         Assert.IsFalse(file.GetAllFrames().Any());
+        Assert.IsFalse(file.GetEnumerator().MoveNext());
+        Assert.IsFalse(file.Any());
     }
 
     [TestMethod]
@@ -488,6 +490,9 @@ public class FwobFileTest
         Assert.AreEqual(0, file.GetFramesAfter(13).Count());
 
         Assert.AreEqual(1, file.GetAllFrames().Count());
+        Assert.IsTrue(file.GetEnumerator().MoveNext());
+        Assert.AreEqual(tick12a, file.First());
+        Assert.AreEqual(1, file.Count());
     }
 
     [TestMethod]
@@ -1731,6 +1736,8 @@ public class FwobFileTest
         Assert.ThrowsException<FileNotOpenedException>(() => file.GetFramesBefore(0).Any());
         Assert.ThrowsException<FileNotOpenedException>(() => file.GetFramesAfter(0).Any());
         Assert.ThrowsException<FileNotOpenedException>(() => file.GetAllFrames().Any());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.GetEnumerator().MoveNext());
+        Assert.ThrowsException<FileNotOpenedException>(() => file.Any());
         Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFrames(tick12a, tick12b));
         Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFrames(new List<Tick> { tick12a }));
         Assert.ThrowsException<FileNotOpenedException>(() => file.AppendFramesTx(tick12a, tick12b));
@@ -1822,6 +1829,8 @@ public class FwobFileTest
         Assert.ThrowsException<FileNotReadableException>(() => file.GetFramesBefore(0).Any());
         Assert.ThrowsException<FileNotReadableException>(() => file.GetFramesAfter(0).Any());
         Assert.ThrowsException<FileNotReadableException>(() => file.GetAllFrames().Any());
+        Assert.ThrowsException<FileNotReadableException>(() => file.GetEnumerator().MoveNext());
+        Assert.ThrowsException<FileNotReadableException>(() => file.Any());
         Assert.AreEqual(2, file.AppendFrames(tick12a, tick12b));
         Assert.AreEqual(1, file.AppendFrames(new List<Tick> { tick12b }));
         Assert.AreEqual(2, file.AppendFramesTx(tick12b, tick12c));

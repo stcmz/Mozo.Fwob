@@ -134,6 +134,8 @@ public class InMemoryFwobFileTest
         Assert.IsFalse(file.GetFramesAfter(0).Any());
         Assert.IsFalse(file.GetFramesBefore(0).Any());
         Assert.IsFalse(file.GetAllFrames().Any());
+        Assert.IsFalse(file.GetEnumerator().MoveNext());
+        Assert.IsFalse(file.Any());
 
         // adding the first
         var tick = new Tick { Time = 12, Value = 99.88 };
@@ -173,6 +175,9 @@ public class InMemoryFwobFileTest
         Assert.AreEqual(1, file.GetFramesAfter(12).Count());
         Assert.AreEqual(0, file.GetFramesAfter(13).Count());
         Assert.AreEqual(1, file.GetAllFrames().Count());
+        Assert.IsTrue(file.GetEnumerator().MoveNext());
+        Assert.AreEqual(1, file.Count());
+        Assert.AreEqual(tick, file.First());
         Assert.AreEqual(1, file.AppendFramesTx(tick));
         Assert.AreEqual(3, file.AppendFramesTx(tick, tick, tick));
 
@@ -192,6 +197,8 @@ public class InMemoryFwobFileTest
         Assert.IsFalse(file.GetFramesBefore(0).Any());
         Assert.IsFalse(file.GetFramesAfter(0).Any());
         Assert.IsFalse(file.GetAllFrames().Any());
+        Assert.IsFalse(file.GetEnumerator().MoveNext());
+        Assert.IsFalse(file.Any());
     }
 
     [TestMethod]

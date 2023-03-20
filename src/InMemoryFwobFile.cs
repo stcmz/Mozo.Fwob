@@ -1,5 +1,5 @@
-﻿using Mozo.Fwob.Exceptions;
-using Mozo.Fwob.Abstraction;
+﻿using Mozo.Fwob.Abstraction;
+using Mozo.Fwob.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +35,7 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
         _title = title;
     }
 
-    #region Implementations of IFrameQueryable
+    #region Implementations of IFrameQueryable<TFrame, TKey>
 
     public override long FrameCount => _frames.Count;
 
@@ -114,6 +114,10 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
     {
         return _frames;
     }
+
+    #endregion
+
+    #region Implementations of IFrameCollection<TFrame, TKey>
 
     public override long AppendFrames(IEnumerable<TFrame> frames)
     {
