@@ -1,7 +1,12 @@
-﻿using System;
+﻿using Mozo.Fwob.Exceptions;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
+using SystemFieldInfo = System.Reflection.FieldInfo;
 
 namespace Mozo.Fwob.Abstraction;
 
@@ -20,6 +25,8 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, 
 
     public static readonly Func<TFrame, TKey> GetKey = GenerateKeyGetter();
 
+    public static readonly Action<TFrame> ValidateFrame = GenerateFrameValidator();
+
     /// <summary>
     /// Dynamically generate a function that gets the key of the given frame<br/>
     /// function: TKey GetKey(TFrame frame)
@@ -31,6 +38,68 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, 
         MemberExpression field = Expression.Field(frame, _FrameInfo.SystemKeyFieldInfo); // frame.KeyField
 
         var lambda = Expression.Lambda<Func<TFrame, TKey>>(field, frame); // (TFrame frame) => frame.KeyField
+
+        return lambda.Compile();
+    }
+
+    /// <summary>
+    /// Dynamically generate a function that checks if a given frame is valid and throws exception if otherwise.
+    /// function: void ValidateFrame(TFrame frame)
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="NotSupportedException"></exception>
+    private static Action<TFrame> GenerateFrameValidator()
+    {
+        ParameterExpression frame = Expression.Parameter(typeof(TFrame), nameof(frame));
+
+        List<Expression> writeExpressions = new(), ifExpressions = new();
+
+        IEnumerable<SystemFieldInfo> fields = typeof(TFrame)
+            .GetFields()
+            .Where(o => o.GetCustomAttribute<IgnoreAttribute>(false) == null);
+
+        foreach (SystemFieldInfo fieldInfo in fields)
+        {
+            int length = fieldInfo.GetCustomAttributes(typeof(LengthAttribute), false)
+                .Cast<LengthAttribute>()
+                .FirstOrDefault()
+                ?.Length ?? 0;
+
+            Type fieldType = fieldInfo.FieldType;
+
+            MemberExpression fieldExp = Expression.Field(frame, fieldInfo); // frame.{field}
+
+            if (length > 0) // Only string field can have the Length attribute
+            {
+                // [Expression] if (frame.{field} != null && frame.{field} > length) throw new StringTooLongException("...");
+                PropertyInfo? lengthPropType = typeof(string).GetProperty(nameof(string.Length));
+
+                Debug.Assert(lengthPropType != null);
+                MemberExpression lengthProp = Expression.Property(fieldExp, lengthPropType); // frame.{field}.Length
+                BinaryExpression notNull = Expression.NotEqual(fieldExp, Expression.Constant(null)); // frame.{field} != null
+                BinaryExpression greaterThan = Expression.GreaterThan(lengthProp, Expression.Constant(length)); // ... > length
+                ConstantExpression exceptionFieldName = Expression.Constant(fieldInfo.Name); // {field.Name}
+                ConstructorInfo? exceptionCtor = typeof(StringTooLongException).GetConstructor(new[] { typeof(string), typeof(string), typeof(int) });
+
+                Debug.Assert(exceptionCtor != null);
+                NewExpression exceptionExp = Expression.New(exceptionCtor, exceptionFieldName, fieldExp, lengthProp); // new StringTooLongException(...)
+                ConditionalExpression ifExp = Expression.IfThen(Expression.AndAlso(notNull, greaterThan), Expression.Throw(exceptionExp)); // if (...) throw ...
+                ifExpressions.Add(ifExp);
+            }
+        }
+
+        Expression bodyExpr;
+
+        if (ifExpressions.Count > 0)
+        {
+            bodyExpr = Expression.Block(ifExpressions.Concat(writeExpressions));
+        }
+        else
+        {
+            bodyExpr = Expression.Constant(true);
+        }
+
+        var lambda = Expression.Lambda<Action<TFrame>>(bodyExpr, frame);
 
         return lambda.Compile();
     }

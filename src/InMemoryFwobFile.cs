@@ -119,6 +119,14 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
 
     #region Implementations of IFrameCollection<TFrame, TKey>
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// In memory FWOB file does not clone frame objects into the collection. Instead, it stores the references to the frames.
+    /// So, beware of appending the same reference multiple times.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when the argument is null.</exception>
+    /// <exception cref="KeyOrderViolationException">Thrown when the input frames are not correctly ordering, resulting in a portion of frames being appended.</exception>
+    /// <exception cref="StringTooLongException">Thrown when any input frame contains a string field value exceeding the defined length, resulting in a portion of frames being appended.</exception>
     public override long AppendFrames(IEnumerable<TFrame> frames)
     {
         if (frames == null)
@@ -132,6 +140,7 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
             if (last != null && GetKey(frame).CompareTo(GetKey(last)) < 0)
                 throw new KeyOrderViolationException();
 
+            ValidateFrame(frame);
             _frames.Add(frame);
             last = frame;
             count++;
@@ -140,6 +149,14 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
         return count;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// In memory FWOB file does not clone frame objects into the collection. Instead, it stores the references to the frames.
+    /// So, beware of appending the same reference multiple times.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when the argument is null.</exception>
+    /// <exception cref="KeyOrderViolationException">Thrown when the input frames are not correctly ordering, in which case no frames will be appended.</exception>
+    /// <exception cref="StringTooLongException">Thrown when any input frame contains a string field value exceeding the defined length, in which case no frames will be appended.</exception>
     public override long AppendFramesTx(IEnumerable<TFrame> frames)
     {
         if (frames == null)
@@ -151,6 +168,7 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
         {
             if (last != null && GetKey(frame).CompareTo(GetKey(last)) < 0)
                 throw new KeyOrderViolationException();
+            ValidateFrame(frame);
             last = frame;
             count++;
         }
