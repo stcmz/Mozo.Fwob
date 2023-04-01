@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <Authors>Maozi Chen</Authors>
     <Company>imozo studio</Company>
     <Version>1.4.0</Version>
