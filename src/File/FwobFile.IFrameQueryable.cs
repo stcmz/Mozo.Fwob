@@ -44,6 +44,24 @@ public partial class FwobFile<TFrame, TKey>
         }
     }
 
+    public override long LowerBoundOf(TKey key)
+    {
+        ValidateAccess(FileAccess.Read);
+        return GetLowerBound(key, 0, Header.FrameCount);
+    }
+
+    public override long UpperBoundOf(TKey key)
+    {
+        ValidateAccess(FileAccess.Read);
+        return GetUpperBound(key, 0, Header.FrameCount);
+    }
+
+    public override (long LowerBound, long UpperBound) EqualRangeOf(TKey key)
+    {
+        ValidateAccess(FileAccess.Read);
+        return GetEqualRange(key, 0, Header.FrameCount);
+    }
+
     protected override TKey InternalGetKeyAt(long index)
     {
         return ReadKey(_br!, Header.FirstFramePosition + index * Header.FrameLength);

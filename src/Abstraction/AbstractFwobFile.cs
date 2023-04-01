@@ -139,6 +139,21 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, 
         return (lb, hi);
     }
 
+    public virtual long LowerBoundOf(TKey key)
+    {
+        return GetLowerBound(key, 0, FrameCount);
+    }
+
+    public virtual long UpperBoundOf(TKey key)
+    {
+        return GetUpperBound(key, 0, FrameCount);
+    }
+
+    public virtual (long LowerBound, long UpperBound) EqualRangeOf(TKey key)
+    {
+        return GetEqualRange(key, 0, FrameCount);
+    }
+
     /// <summary>
     /// Get the key of the <typeparamref name="TFrame"/> instance at the given position, assuming the <paramref name="index"/> is valid.
     /// </summary>

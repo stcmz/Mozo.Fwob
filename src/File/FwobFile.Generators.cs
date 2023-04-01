@@ -1,5 +1,4 @@
-﻿using Mozo.Fwob.Abstraction;
-using Mozo.Fwob.Exceptions;
+﻿using Mozo.Fwob.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,7 +10,7 @@ using SystemFieldInfo = System.Reflection.FieldInfo;
 
 namespace Mozo.Fwob;
 
-// Dynamically generate functions using expression trees for asscesing an on-disk FWOB file
+// Dynamically generate functions using expression trees for reading/writing a frame/key from/to an on-disk FWOB file.
 public partial class FwobFile<TFrame, TKey>
 {
     protected static readonly Action<BinaryWriter, TFrame> WriteFrame = GenerateFrameWriter();
@@ -21,7 +20,7 @@ public partial class FwobFile<TFrame, TKey>
     protected static readonly Func<BinaryReader, long, TKey> ReadKey = GenerateKeyReader();
 
     /// <summary>
-    /// Dynamically generate a function that reads the key of the frame at the given stream position
+    /// Dynamically generate a function that reads the key of the frame at the given stream position.
     /// function: TKey ReadKey(BinaryReader br, long framePos)
     /// </summary>
     /// <returns></returns>
@@ -62,7 +61,7 @@ public partial class FwobFile<TFrame, TKey>
     }
 
     /// <summary>
-    /// Dynamically generate a  a function that reads a frame at the current stream position
+    /// Dynamically generate a  a function that reads a frame at the current stream position.
     /// function: TFrame ReadFrame(BinaryReader br)
     /// </summary>
     /// <returns></returns>
@@ -121,7 +120,7 @@ public partial class FwobFile<TFrame, TKey>
     }
 
     /// <summary>
-    /// Dynamically generate a function that writes the given frame to the current stream position
+    /// Dynamically generate a function that writes the given frame to the current stream position.
     /// function: void WriteFrame(BinaryWriter bw, TFrame frame)
     /// </summary>
     /// <returns></returns>
