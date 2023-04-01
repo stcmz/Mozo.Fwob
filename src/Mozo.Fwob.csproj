@@ -10,7 +10,7 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <Authors>Maozi Chen</Authors>
     <Company>imozo studio</Company>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <PackageProjectUrl>https://github.com/stcmz/Mozo.Fwob</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/stcmz/Mozo.Fwob.git</RepositoryUrl>
