@@ -52,7 +52,17 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, 
     {
         ParameterExpression frame = Expression.Parameter(typeof(TFrame), nameof(frame));
 
-        List<Expression> writeExpressions = new(), ifExpressions = new();
+        List<Expression> ifExpressions = new();
+
+        // [Expression] if (frame == null) throw new NullReferenceException(nameof(frame));
+        ConstantExpression frameArgName = Expression.Constant(frame.Name); // nameof(frame)
+        ConstructorInfo? nullExceptionCtor = typeof(ArgumentNullException).GetConstructor(new[] { typeof(string) });
+
+        Debug.Assert(nullExceptionCtor != null);
+        NewExpression nullExceptionExp = Expression.New(nullExceptionCtor, frameArgName); // new StringTooLongException(...)
+        ConstantExpression nullExpr = Expression.Constant(null);
+        ConditionalExpression ifNullExp = Expression.IfThen(Expression.Equal(frame, nullExpr), Expression.Throw(nullExceptionExp)); // if (...) throw ...
+        ifExpressions.Add(ifNullExp);
 
         IEnumerable<SystemFieldInfo> fields = typeof(TFrame)
             .GetFields()
@@ -88,20 +98,16 @@ public abstract class AbstractFwobFile<TFrame, TKey> : IFrameCollection<TFrame, 
             }
         }
 
-        Expression bodyExpr;
-
-        if (ifExpressions.Count > 0)
+        if (ifExpressions.Count == 1)
         {
-            bodyExpr = Expression.Block(ifExpressions.Concat(writeExpressions));
+            var lambda = Expression.Lambda<Action<TFrame>>(ifExpressions[0], frame);
+            return lambda.Compile();
         }
         else
         {
-            bodyExpr = Expression.Constant(true);
+            var lambda = Expression.Lambda<Action<TFrame>>(Expression.Block(ifExpressions), frame);
+            return lambda.Compile();
         }
-
-        var lambda = Expression.Lambda<Action<TFrame>>(bodyExpr, frame);
-
-        return lambda.Compile();
     }
 
     #region Implementations of IEnumerable<TFrame>

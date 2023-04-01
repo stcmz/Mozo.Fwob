@@ -1,4 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mozo.Fwob.Abstraction;
 using Mozo.Fwob.Exceptions;
 using System;
@@ -10,6 +12,11 @@ namespace Mozo.Fwob.UnitTest;
 [TestClass]
 public class FrameInfoTest
 {
+    public class KeyOnlyTick
+    {
+        public int Key;
+    }
+
     public class TypedTick
     {
         public ulong ULong;
@@ -108,7 +115,7 @@ public class FrameInfoTest
         {
             Assert.AreEqual(file.FrameInfo.Fields[i].IsKey, (keyIndex == i));
         }
-        Assert.AreEqual(file.FrameInfo.KeyFieldIndex, keyIndex);
+        Assert.AreEqual(keyIndex, file.FrameInfo.KeyFieldIndex);
 
         Assert.AreEqual(8, file.FrameInfo.Fields[0].FieldLength);
         Assert.AreEqual(4, file.FrameInfo.Fields[1].FieldLength);
@@ -167,13 +174,54 @@ public class FrameInfoTest
     {
         InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
         Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
+        Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
         ValidateFrameInfo(memfile, keyIndex);
 
         string temp = Path.GetTempFileName();
         using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
             Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
             ValidateFrameInfo(file, keyIndex);
+        }
+        File.Delete(temp);
+    }
+
+    private static void ValidateFrameInfoKeyOnly(AbstractFwobFile<KeyOnlyTick, int> file)
+    {
+        Assert.AreEqual(4, file.FrameInfo.FrameLength);
+        Assert.AreEqual(0ul, file.FrameInfo.FieldTypes);
+        Assert.AreEqual(1, file.FrameInfo.Fields.Count);
+
+        Assert.IsTrue(file.FrameInfo.Fields[0].IsKey);
+        Assert.AreEqual(0, file.FrameInfo.KeyFieldIndex);
+
+        Assert.AreEqual(4, file.FrameInfo.Fields[0].FieldLength);
+
+        Assert.AreEqual("Key", file.FrameInfo.Fields[0].FieldName);
+
+        Assert.AreEqual(FieldType.SignedInteger, file.FrameInfo.Fields[0].FieldType);
+
+        Assert.IsNull(file.GetKeyAt(0));
+        var frame = new KeyOnlyTick();
+        file.AppendFrames(frame);
+        Assert.AreEqual(0, file.GetKeyAt(0)?.CompareTo(AbstractFwobFile<KeyOnlyTick, int>.GetKey(frame)));
+    }
+
+    [TestMethod]
+    public void TestKeyOnlyTypes()
+    {
+        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<KeyOnlyTick, int>.ValidateFrame(null));
+
+        InMemoryFwobFile<KeyOnlyTick, int> memfile = new("TestTypes");
+        Assert.AreEqual(typeof(KeyOnlyTick).Name, memfile.FrameInfo.FrameType);
+        ValidateFrameInfoKeyOnly(memfile);
+
+        string temp = Path.GetTempFileName();
+        using (FwobFile<KeyOnlyTick, int> file = new(temp, "TestTypes"))
+        {
+            Assert.AreEqual(typeof(KeyOnlyTick).Name, file.FrameInfo.FrameType);
+            ValidateFrameInfoKeyOnly(file);
         }
         File.Delete(temp);
     }
@@ -267,9 +315,9 @@ public class FrameInfoTest
 
         for (int i = 0; i < 8; i++)
         {
-            Assert.AreEqual(file.FrameInfo.Fields[i].IsKey, (keyIndex == i));
+            Assert.AreEqual((keyIndex == i), file.FrameInfo.Fields[i].IsKey);
         }
-        Assert.AreEqual(file.FrameInfo.KeyFieldIndex, keyIndex);
+        Assert.AreEqual(keyIndex, file.FrameInfo.KeyFieldIndex);
 
         Assert.AreEqual(8, file.FrameInfo.Fields[0].FieldLength);
         Assert.AreEqual(4, file.FrameInfo.Fields[1].FieldLength);
@@ -309,13 +357,16 @@ public class FrameInfoTest
         where TKey : struct, IComparable<TKey>
     {
         InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
+
         Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
+        Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
         ValidateFrameInfoIgnored(memfile, keyIndex);
 
         string temp = Path.GetTempFileName();
         using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
             Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
+            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
             ValidateFrameInfoIgnored(file, keyIndex);
         }
         File.Delete(temp);
@@ -811,6 +862,9 @@ public class FrameInfoTest
         where TKey2 : struct, IComparable<TKey2>
         where TException : Exception
     {
+        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame1, TKey1>.ValidateFrame(null));
+        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame2, TKey2>.ValidateFrame(null));
+
         string temp = Path.GetTempFileName();
         Assert.ThrowsException<TException>(() =>
         {
@@ -839,3 +893,5 @@ public class FrameInfoTest
         TestFrameTypeMismatchThrown<Tick9, TickTypes.Tick9, int, int, FrameTypeMismatchException>();
     }
 }
+
+#pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
