@@ -34,6 +34,8 @@ public partial class FwobFile<TFrame, TKey>
     /// <param name="srcPath">A file path to be loaded and splitted.</param>
     /// <param name="outDirPath">A path to a directory where the splitted files will be stored.</param>
     /// <param name="firstKeys">Keys that end a segment.</param>
+    /// <param name="mode">A <see cref="FileMode"/> enum used in the creation of the segment files.</param>
+    /// <param name="share">A <see cref="FileShare"/> enum used in the creation of the segment files.</param>
     /// <param name="ignoreEmptyParts">A boolean indicating if an empty part should be emitted</param>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentException"></exception>
@@ -123,7 +125,7 @@ public partial class FwobFile<TFrame, TKey>
     /// <summary>
     /// Concatenate a sequence of *.FWOB files whose paths are given by <paramref name="srcPaths"/>.<br/>
     /// The outcome file will contain concatenated frames that follow the specified order of the source files.<br/>
-    /// The frame keys will be checked to enforce the ordering rule and a <see cref="KeyOrderingException"/> will be thrown if violated.
+    /// The frame keys will be checked to enforce the ordering rule and a <see cref="KeyOrderViolationException"/> will be thrown if violated.
     /// </summary>
     /// <param name="dstPath">A path to store the resulting FWOB file.</param>
     /// <param name="srcPaths">A sequence of *.FWOB files to be concatenated.</param>
@@ -141,10 +143,12 @@ public partial class FwobFile<TFrame, TKey>
     /// <summary>
     /// Concatenate a sequence of *.FWOB files whose paths are given by <paramref name="srcPaths"/>.<br/>
     /// The outcome file will contain concatenated frames that follow the specified order of the source files.<br/>
-    /// The frame keys will be checked to enforce the ordering rule and a <see cref="KeyOrderingException"/> will be thrown if violated.
+    /// The frame keys will be checked to enforce the ordering rule and a <see cref="KeyOrderViolationException"/> will be thrown if violated.
     /// </summary>
     /// <param name="dstPath">A path to store the resulting FWOB file.</param>
     /// <param name="srcPaths">A sequence of *.FWOB files to be concatenated.</param>
+    /// <param name="mode">A <see cref="FileMode"/> enum used in the creation of the destination files.</param>
+    /// <param name="share">A <see cref="FileShare"/> enum used in the creation of the destination files.</param>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>

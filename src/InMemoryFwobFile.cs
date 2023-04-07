@@ -76,7 +76,7 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
     public override IEnumerable<TFrame> GetFramesBetween(TKey firstKey, TKey lastKey)
     {
         if (firstKey.CompareTo(lastKey) > 0)
-            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}");
+            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}", nameof(lastKey));
 
         if (_frames.Count == 0)
             yield break;
@@ -219,7 +219,7 @@ public sealed class InMemoryFwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TK
     public override long DeleteFramesBetween(TKey firstKey, TKey lastKey)
     {
         if (firstKey.CompareTo(lastKey) > 0)
-            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}");
+            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}", nameof(lastKey));
 
         if (_frames.Count == 0)
             return 0;

@@ -174,14 +174,16 @@ public class FrameInfoTest
     {
         InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
         Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
-        Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
+        Assert.AreEqual("frame", exception1.ParamName);
         ValidateFrameInfo(memfile, keyIndex);
 
         string temp = Path.GetTempFileName();
         using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
             Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
-            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
+            ArgumentNullException exception2 = Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
+            Assert.AreEqual("frame", exception2.ParamName);
             ValidateFrameInfo(file, keyIndex);
         }
         File.Delete(temp);
@@ -211,7 +213,8 @@ public class FrameInfoTest
     [TestMethod]
     public void TestKeyOnlyTypes()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<KeyOnlyTick, int>.ValidateFrame(null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<KeyOnlyTick, int>.ValidateFrame(null));
+        Assert.AreEqual("frame", exception1.ParamName);
 
         InMemoryFwobFile<KeyOnlyTick, int> memfile = new("TestTypes");
         Assert.AreEqual(typeof(KeyOnlyTick).Name, memfile.FrameInfo.FrameType);
@@ -359,14 +362,16 @@ public class FrameInfoTest
         InMemoryFwobFile<TFrame, TKey> memfile = new("TestTypes");
 
         Assert.AreEqual(typeof(TFrame).Name, memfile.FrameInfo.FrameType);
-        Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => InMemoryFwobFile<TFrame, TKey>.ValidateFrame(null));
+        Assert.AreEqual("frame", exception1.ParamName);
         ValidateFrameInfoIgnored(memfile, keyIndex);
 
         string temp = Path.GetTempFileName();
         using (FwobFile<TFrame, TKey> file = new(temp, "TestTypes"))
         {
             Assert.AreEqual(typeof(TFrame).Name, file.FrameInfo.FrameType);
-            Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
+            ArgumentNullException exception2 = Assert.ThrowsException<ArgumentNullException>(() => FwobFile<TFrame, TKey>.ValidateFrame(null));
+            Assert.AreEqual("frame", exception2.ParamName);
             ValidateFrameInfoIgnored(file, keyIndex);
         }
         File.Delete(temp);
@@ -855,22 +860,25 @@ public class FrameInfoTest
         }
     }
 
-    private static void TestFrameTypeMismatchThrown<TFrame1, TFrame2, TKey1, TKey2, TException>()
+    private static void TestFrameTypeMismatchThrown<TFrame1, TFrame2, TKey1, TKey2>()
         where TFrame1 : class, new()
         where TFrame2 : class, new()
         where TKey1 : struct, IComparable<TKey1>
         where TKey2 : struct, IComparable<TKey2>
-        where TException : Exception
     {
-        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame1, TKey1>.ValidateFrame(null));
-        Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame2, TKey2>.ValidateFrame(null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame1, TKey1>.ValidateFrame(null));
+        Assert.AreEqual("frame", exception1.ParamName);
+        ArgumentNullException exception2 = Assert.ThrowsException<ArgumentNullException>(() => AbstractFwobFile<TFrame2, TKey2>.ValidateFrame(null));
+        Assert.AreEqual("frame", exception2.ParamName);
 
         string temp = Path.GetTempFileName();
-        Assert.ThrowsException<TException>(() =>
+        FrameTypeMismatchException exception3 = Assert.ThrowsException<FrameTypeMismatchException>(() =>
         {
             using (FwobFile<TFrame1, TKey1> file = new(temp, "TestTypes")) { }
             using (FwobFile<TFrame2, TKey2> file = new(temp)) { }
         });
+        Assert.AreEqual(temp, exception3.FileName);
+        Assert.AreEqual(typeof(TFrame2), exception3.FrameType);
         File.Delete(temp);
     }
 
@@ -881,16 +889,16 @@ public class FrameInfoTest
         //TestFrameTypeMismatchThrown<Tick0a, TickTypes.Tick0a, int, long, FrameTypeMismatchException>();
         //TestFrameTypeMismatchThrown<Tick0b, TickTypes.Tick0b, int, int, FrameTypeMismatchException>();
 
-        TestFrameTypeMismatchThrown<Tick1, Tick2, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick1, TickTypes.Tick1, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick2, TickTypes.Tick2, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick3, TickTypes.Tick3, int, float, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick4, TickTypes.Tick4, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick5, TickTypes.Tick5, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick6, TickTypes.Tick6, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick7, TickTypes.Tick7, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick8, TickTypes.Tick8, int, int, FrameTypeMismatchException>();
-        TestFrameTypeMismatchThrown<Tick9, TickTypes.Tick9, int, int, FrameTypeMismatchException>();
+        TestFrameTypeMismatchThrown<Tick1, Tick2, int, int>();
+        TestFrameTypeMismatchThrown<Tick1, TickTypes.Tick1, int, int>();
+        TestFrameTypeMismatchThrown<Tick2, TickTypes.Tick2, int, int>();
+        TestFrameTypeMismatchThrown<Tick3, TickTypes.Tick3, int, float>();
+        TestFrameTypeMismatchThrown<Tick4, TickTypes.Tick4, int, int>();
+        TestFrameTypeMismatchThrown<Tick5, TickTypes.Tick5, int, int>();
+        TestFrameTypeMismatchThrown<Tick6, TickTypes.Tick6, int, int>();
+        TestFrameTypeMismatchThrown<Tick7, TickTypes.Tick7, int, int>();
+        TestFrameTypeMismatchThrown<Tick8, TickTypes.Tick8, int, int>();
+        TestFrameTypeMismatchThrown<Tick9, TickTypes.Tick9, int, int>();
     }
 }
 

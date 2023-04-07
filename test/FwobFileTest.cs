@@ -19,15 +19,16 @@ public class FwobFileTest
     public void TestFileFormatIntegrity()
     {
         string temp = Path.GetTempFileName();
-        Assert.ThrowsException<CorruptedFileHeaderException>(() =>
+        CorruptedFileHeaderException exception1 = Assert.ThrowsException<CorruptedFileHeaderException>(() =>
         {
             byte[] bytes = Enumerable.Range(0, 255).Select(o => (byte)o).ToArray();
             File.WriteAllBytes(temp, bytes);
             using FwobFile<Tick, int> file = new(temp);
         });
+        Assert.AreEqual(temp, exception1.FileName);
         File.Delete(temp);
 
-        Assert.ThrowsException<CorruptedFileLengthException>(() =>
+        CorruptedFileLengthException exception2 = Assert.ThrowsException<CorruptedFileLengthException>(() =>
         {
             using (FwobFile<Tick, int> file = new(temp, "TestTick"))
             {
@@ -36,9 +37,12 @@ public class FwobFileTest
             File.AppendAllText(temp, "A");
             using FwobFile<Tick, int> file2 = new(temp);
         });
+        Assert.AreEqual(temp, exception2.FileName);
+        Assert.AreEqual(2048 + 16 * 5 + 1, exception2.ActualLength);
+        Assert.AreEqual(2048 + 16 * 5, exception2.FileLength);
         File.Delete(temp);
 
-        Assert.ThrowsException<CorruptedFileLengthException>(() =>
+        CorruptedFileLengthException exception3 = Assert.ThrowsException<CorruptedFileLengthException>(() =>
         {
             using (FwobFile<Tick, int> file = new(temp, "TestTick"))
             {
@@ -51,9 +55,12 @@ public class FwobFileTest
             }
             using FwobFile<Tick, int> file3 = new(temp);
         });
+        Assert.AreEqual(temp, exception3.FileName);
+        Assert.AreEqual(2048 + 16 * 5, exception3.ActualLength);
+        Assert.AreEqual(2048 + 16 * 4294967295L, exception3.FileLength);
         File.Delete(temp);
 
-        Assert.ThrowsException<CorruptedStringTableLengthException>(() =>
+        CorruptedStringTableLengthException exception4 = Assert.ThrowsException<CorruptedStringTableLengthException>(() =>
         {
             long stPos;
             using (FwobFile<Tick, int> file = new(temp, "TestTick"))
@@ -73,6 +80,32 @@ public class FwobFileTest
             using FwobFile<Tick, int> file3 = new(temp);
             file3.LoadStringTable();
         });
+        Assert.AreEqual(temp, exception4.FileName);
+        Assert.AreEqual(106, exception4.ActualLength);
+        Assert.AreEqual(22, exception4.StringTableLength);
+        File.Delete(temp);
+
+        CorruptedStringTableLengthException exception5 = Assert.ThrowsException<CorruptedStringTableLengthException>(() =>
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+            {
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+                file.AppendString("asdf");
+                file.AppendString("asdf");
+                file.AppendString("asdf2");
+                file.AppendString("asdf3");
+            }
+            using (FileStream file2 = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file2.Seek(162, SeekOrigin.Begin);
+                file2.Write(new byte[] { 5 });
+            }
+            using FwobFile<Tick, int> file3 = new(temp);
+            file3.LoadStringTable();
+        });
+        Assert.AreEqual(temp, exception5.FileName);
+        Assert.AreEqual(22, exception5.ActualLength);
+        Assert.AreEqual(5, exception5.StringTableLength);
         File.Delete(temp);
     }
 
@@ -342,6 +375,11 @@ public class FwobFileTest
         ValidateNoFrame(file);
 
         file.Dispose();
+
+        file = new(tmpPath1);
+        ValidateNoFrame(file);
+
+        file.Dispose();
         File.Delete(tmpPath1);
     }
 
@@ -352,6 +390,11 @@ public class FwobFileTest
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
         AddOneFrame(file);
+        ValidateOneFrame(file);
+
+        file.Dispose();
+
+        file = new(tmpPath1);
         ValidateOneFrame(file);
 
         file.Dispose();
@@ -366,12 +409,12 @@ public class FwobFileTest
 
         Assert.AreEqual(new FileInfo(tmpPath1).Length, FwobHeader.HeaderLength + FwobHeader.DefaultStringTablePreservedLength);
         file.DeleteAllFrames();
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
         file.Dispose();
 
         Assert.AreEqual(new FileInfo(tmpPath1).Length, FwobHeader.HeaderLength + FwobHeader.DefaultStringTablePreservedLength);
         file = new FwobFile<Tick, int>(tmpPath1);
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -383,7 +426,7 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
         AddOneFrame(file);
         ValidateOneFrame(file);
         file.Dispose();
@@ -391,7 +434,7 @@ public class FwobFileTest
         file = new FwobFile<Tick, int>(tmpPath1);
         ValidateOneFrame(file);
         file.DeleteAllFrames();
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -416,7 +459,7 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
         AddFramesSameKey(file);
         ValidateFramesSameKey(file);
         file.Dispose();
@@ -424,7 +467,7 @@ public class FwobFileTest
         file = new FwobFile<Tick, int>(tmpPath1);
         ValidateFramesSameKey(file);
         file.DeleteAllFrames();
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -449,7 +492,7 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
         AddFramesMultiKeys(file);
         ValidateFramesMultiKeys(file);
         file.Dispose();
@@ -457,7 +500,7 @@ public class FwobFileTest
         file = new FwobFile<Tick, int>(tmpPath1);
         ValidateFramesMultiKeys(file);
         file.DeleteAllFrames();
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -469,11 +512,11 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         using FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        AddFramesPartially(file);
-        AddFramesPartially2(file);
+        AddFramesPartially(file, tmpPath1);
+        AddFramesPartially2(file, tmpPath1);
         ValidateFramesPartially(file);
 
-        AddFramesPartially2(file);
+        AddFramesPartially2(file, tmpPath1);
         ValidateFramesPartially(file);
 
         file.Dispose();
@@ -486,7 +529,7 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateFrameStringField(file);
+        ValidateFrameStringField(file, tmpPath1);
 
         file.Dispose();
         file = new FwobFile<Tick, int>(tmpPath1);
@@ -503,19 +546,19 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateNoFrame(file);
-        AddFramesPartially(file);
-        AddFramesPartially2(file);
+        ValidateNoFrame(file, tmpPath1);
+        AddFramesPartially(file, tmpPath1);
+        AddFramesPartially2(file, tmpPath1);
         ValidateFramesPartially(file);
 
-        AddFramesPartially2(file);
+        AddFramesPartially2(file, tmpPath1);
         ValidateFramesPartially(file);
         file.Dispose();
 
         file = new FwobFile<Tick, int>(tmpPath1);
         ValidateFramesPartially(file);
         file.DeleteAllFrames();
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -527,7 +570,7 @@ public class FwobFileTest
         string tmpPath1 = Path.GetTempFileName();
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
-        ValidateFramesAppendingTx(file);
+        ValidateFramesAppendingTx(file, tmpPath1);
 
         file.Dispose();
         File.Delete(tmpPath1);
@@ -540,7 +583,7 @@ public class FwobFileTest
         FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
 
         Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12c, tick100, tick13));
-        ValidateNoFrame(file);
+        ValidateNoFrame(file, tmpPath1);
         AddOneFrame(file);
         file.Dispose();
 

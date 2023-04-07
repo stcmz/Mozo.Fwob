@@ -94,8 +94,9 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
         if (Header.FileLength != _br.BaseStream.Length)
         {
             long actualLength = _br.BaseStream.Length;
+            long expectedLength = Header.FileLength;
             Close();
-            throw new CorruptedFileLengthException(path, Header.FileLength, actualLength);
+            throw new CorruptedFileLengthException(path, expectedLength, actualLength);
         }
 
         if (FrameCount > 0)
@@ -113,6 +114,7 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
     /// <param name="mode">A constant that determines how to open or create the file.</param>
     /// <param name="access">A constant that determines how the file can be accessed by the FileStream object.</param>
     /// <param name="share">A constant that determines how the file will be shared by processes.</param>
+    /// <param name="preservedStringTableLength">An integer that represents the number of bytes that will be preserved for the string table.</param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentException"></exception>

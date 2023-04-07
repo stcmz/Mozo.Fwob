@@ -14,49 +14,49 @@ public sealed class FwobHeader
 
     //*********************** Signature and Version (5 bytes) ************************//
 
-    // pos 0: 4 bytes
+    // pos 0x00 (0): 4 bytes
     public const string Signature = "FWOB";
 
-    // pos 4: 1 byte
+    // pos 0x04 (4): 1 byte
     public byte Version { get; set; }
 
     //*********************** Descriptors of Fields (153 bytes) ************************//
 
-    // pos 5: 1 byte (allow up to 16 fields)
+    // pos 0x05 (5): 1 byte (allow up to 16 fields)
     public byte FieldCount { get; set; }
 
-    // pos 6: 16 bytes (allow up to 16 fields)
+    // pos 0x06 (6): 16 bytes (allow up to 16 fields)
     public byte[] FieldLengths { get; set; }
 
-    // pos 22: 8 bytes (up to 16 types, each has 3 bits, up to 8 types defined on FieldType)
+    // pos 0x16 (22): 8 bytes (up to 16 types, each has 3 bits, up to 8 types defined on FieldType)
     public ulong FieldTypes { get; set; }
 
-    // pos 30: 128 bytes (allow up to 16*8 chars)
+    // pos 0x1E (30): 128 bytes (allow up to 16*8 chars)
     public string[] FieldNames { get; set; }
 
     //*********************** Size of String Tables (12 bytes) ************************//
 
-    // pos 158: 4 bytes
+    // pos 0x9E (158): 4 bytes
     public int StringCount { get; set; }
 
-    // pos 162: 4 bytes
+    // pos 0xA2 (162): 4 bytes
     public int StringTableLength { get; set; }
 
-    // pos 166: 4 bytes
+    // pos 0xA6 (166): 4 bytes
     public int StringTablePreservedLength { get; set; }
 
     //*********************** Frames (44 bytes) ************************//
 
-    // pos 170: 8 bytes
+    // pos 0xAA (170): 8 bytes
     public long FrameCount { get; set; }
 
-    // pos 178: 4 bytes (should be the sum of FieldLengths)
+    // pos 0xB2 (178): 4 bytes (should be the sum of FieldLengths)
     public int FrameLength { get; set; }
 
-    // pos 182: 16 bytes (up to 16 chars)
+    // pos 0xB6 (182): 16 bytes (up to 16 chars)
     public string FrameType { get; set; }
 
-    // pos 198: 16 bytes (up to 16 chars)
+    // pos 0xC6 (198): 16 bytes (up to 16 chars)
     public string Title { get; set; }
 
     public long StringTablePosition => HeaderLength;

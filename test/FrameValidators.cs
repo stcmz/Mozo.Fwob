@@ -69,9 +69,15 @@ internal class FrameValidators
         Assert.AreEqual(0, file.Strings.Count);
 
         Assert.AreEqual("HelloFwob", file.Title);
-        Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
-        Assert.ThrowsException<ArgumentException>(() => file.Title = "");
-        Assert.ThrowsException<TitleTooLongException>(() => file.Title = "0123456789abcdefg");
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => file.Title = null);
+        Assert.AreEqual("value", exception1.ParamName);
+
+        ArgumentException exception2 = Assert.ThrowsException<ArgumentException>(() => file.Title = "");
+        Assert.AreEqual("value", exception2.ParamName);
+
+        TitleTooLongException exception3 = Assert.ThrowsException<TitleTooLongException>(() => file.Title = "0123456789abcdefg");
+        Assert.AreEqual("0123456789abcdefg", exception3.Title);
+        Assert.AreEqual(17, exception3.TitleLength);
 
         file.Title = "New Title";
         Assert.AreEqual("New Title", file.Title);
@@ -82,8 +88,11 @@ internal class FrameValidators
     /// </summary>
     internal static void AddOneFrame(IFrameCollection<Tick, int> file)
     {
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames(null));
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames((IEnumerable<Tick>)null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames(null));
+        Assert.AreEqual("frames", exception1.ParamName);
+
+        ArgumentNullException exception2 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames((IEnumerable<Tick>)null));
+        Assert.AreEqual("frames", exception2.ParamName);
         Assert.AreEqual(0, file.AppendFrames());
         Assert.AreEqual(1, file.AppendFrames(tick12a));
     }
@@ -107,17 +116,19 @@ internal class FrameValidators
     /// <summary>
     /// Try to add incorrectly ordered frames <see cref="tick12a"/>, <see cref="tick100"/>, <see cref="tick13"/> to the collection.
     /// </summary>
-    internal static void AddFramesPartially(IFrameCollection<Tick, int> file)
+    internal static void AddFramesPartially(IFrameCollection<Tick, int> file, string? fileName = null)
     {
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a, tick100, tick13));
+        KeyOrderViolationException exception1 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a, tick100, tick13));
+        Assert.AreEqual(fileName, exception1.FileName);
     }
 
     /// <summary>
     /// Try to add exactly one frame <see cref="tick13"/> to the collection.
     /// </summary>
-    internal static void AddFramesPartially2(IFrameCollection<Tick, int> file)
+    internal static void AddFramesPartially2(IFrameCollection<Tick, int> file, string? fileName = null)
     {
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick13));
+        KeyOrderViolationException exception1 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick13));
+        Assert.AreEqual(fileName, exception1.FileName);
     }
 
     /// <summary>
@@ -125,7 +136,7 @@ internal class FrameValidators
     /// Assuming the collection contains exactly zero frame.
     /// </summary>
     /// <param name="file"></param>
-    internal static void ValidateNoFrame(IFrameQueryable<Tick, int> file)
+    internal static void ValidateNoFrame(IFrameQueryable<Tick, int> file, string? fileName = null)
     {
         Assert.IsNotNull(file);
 
@@ -157,7 +168,8 @@ internal class FrameValidators
         Assert.IsFalse(file.GetFrames(0).Any());
         Assert.IsFalse(file.GetFrames(0, 1000).Any());
 
-        Assert.ThrowsException<ArgumentException>(() => file.GetFramesBetween(12, 0).Any());
+        ArgumentException exception1 = Assert.ThrowsException<ArgumentException>(() => file.GetFramesBetween(12, 0).Any());
+        Assert.AreEqual("lastKey", exception1.ParamName);
         Assert.IsFalse(file.GetFramesBetween(0, 12).Any());
 
         Assert.IsFalse(file.GetFramesBefore(-1000).Any());
@@ -517,7 +529,8 @@ internal class FrameValidators
         Assert.AreEqual(1, file.GetFrames(13, 100, 1000).Count());
         Assert.AreEqual(2, file.GetFrames(11, 12, 13, 100, 1000).Count());
 
-        Assert.ThrowsException<ArgumentException>(() => file.GetFramesBetween(20, -1).Count());
+        ArgumentException exception1 = Assert.ThrowsException<ArgumentException>(() => file.GetFramesBetween(20, -1).Count());
+        Assert.AreEqual("lastKey", exception1.ParamName);
         Assert.AreEqual(1, file.GetFramesBetween(-1, 20).Count());
         Assert.AreEqual(1, file.GetFramesBetween(11, 20).Count());
         Assert.AreEqual(1, file.GetFramesBetween(12, 20).Count());
@@ -554,39 +567,50 @@ internal class FrameValidators
     /// Assuming the collection contains zero frame.
     /// </summary>
     /// <param name="file"></param>
-    internal static void ValidateFramesAppendingTx(IFrameCollection<Tick, int> file)
+    internal static void ValidateFramesAppendingTx(IFrameCollection<Tick, int> file, string? fileName = null)
     {
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames(null));
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames((IEnumerable<Tick>)null));
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFramesTx(null));
-        Assert.ThrowsException<ArgumentNullException>(() => file.AppendFramesTx((IEnumerable<Tick>)null));
+        ArgumentNullException exception1 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames(null));
+        Assert.AreEqual("frames", exception1.ParamName);
+        ArgumentNullException exception2 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFrames((IEnumerable<Tick>)null));
+        Assert.AreEqual("frames", exception2.ParamName);
+        ArgumentNullException exception3 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFramesTx(null));
+        Assert.AreEqual("frames", exception3.ParamName);
+        ArgumentNullException exception4 = Assert.ThrowsException<ArgumentNullException>(() => file.AppendFramesTx((IEnumerable<Tick>)null));
+        Assert.AreEqual("frames", exception4.ParamName);
         Assert.AreEqual(0, file.AppendFramesTx());
         ValidateNoFrame(file);
 
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a, tick100, tick13));
+        KeyOrderViolationException exception5 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a, tick100, tick13));
+        Assert.AreEqual(fileName, exception5.FileName);
         ValidateFramesPartially(file);
 
         // Clearing
         file.DeleteAllFrames();
 
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a, tick100, tick13));
+        KeyOrderViolationException exception6 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a, tick100, tick13));
+        Assert.AreEqual(fileName, exception6.FileName);
         ValidateNoFrame(file);
 
         AddOneFrame(file);
         ValidateOneFrame(file);
 
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick100, tick13));
+        KeyOrderViolationException exception7 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick100, tick13));
+        Assert.AreEqual(fileName, exception7.FileName);
         ValidateOneFrame(file);
 
         Assert.AreEqual(1, file.AppendFrames(tick100));
         ValidateFramesPartially(file);
 
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick13));
+        KeyOrderViolationException exception8 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick13));
+        Assert.AreEqual(fileName, exception8.FileName);
         ValidateFramesPartially(file);
 
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a));
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12b));
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick13));
+        KeyOrderViolationException exception9 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a));
+        Assert.AreEqual(fileName, exception9.FileName);
+        KeyOrderViolationException exception10 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12b));
+        Assert.AreEqual(fileName, exception10.FileName);
+        KeyOrderViolationException exception11 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick13));
+        Assert.AreEqual(fileName, exception11.FileName);
         ValidateFramesPartially(file);
 
         // Clearing
@@ -603,7 +627,7 @@ internal class FrameValidators
     /// Assuming the collection contains zero frame.
     /// </summary>
     /// <param name="file"></param>
-    internal static void ValidateFrameStringField(IFrameCollection<Tick, int> file)
+    internal static void ValidateFrameStringField(IFrameCollection<Tick, int> file, string? fileName = null)
     {
         // Non-transactional
         tick13.Str = null;
@@ -631,13 +655,17 @@ internal class FrameValidators
         Assert.AreEqual(4, file.FrameCount);
 
         tick13.Str = "abcde";
-        Assert.ThrowsException<StringTooLongException>(() => file.AppendFrames(tick13));
+        StringTooLongException exception1 = Assert.ThrowsException<StringTooLongException>(() => file.AppendFrames(tick13));
+        Assert.AreEqual("Str", exception1.FieldName);
+        Assert.AreEqual("abcde", exception1.StringLiteral);
+        Assert.AreEqual(5, exception1.StringLength);
         Assert.IsNull(file.GetFrameAt(4));
 
         tick13.Str = "abcd";
         Assert.AreEqual(tick13, file.LastFrame);
         Assert.AreEqual(4, file.FrameCount);
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a));
+        KeyOrderViolationException exception2 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFrames(tick12a));
+        Assert.AreEqual(fileName, exception2.FileName);
         Assert.AreEqual(4, file.FrameCount);
 
         // Transactional
@@ -666,13 +694,17 @@ internal class FrameValidators
         Assert.AreEqual(8, file.FrameCount);
 
         tick13.Str = "abcde";
-        Assert.ThrowsException<StringTooLongException>(() => file.AppendFramesTx(tick13));
+        StringTooLongException exception3 = Assert.ThrowsException<StringTooLongException>(() => file.AppendFramesTx(tick13));
+        Assert.AreEqual("Str", exception3.FieldName);
+        Assert.AreEqual("abcde", exception3.StringLiteral);
+        Assert.AreEqual(5, exception3.StringLength);
         Assert.IsNull(file.GetFrameAt(8));
 
         tick13.Str = "abcd";
         Assert.AreEqual(tick13, file.LastFrame);
         Assert.AreEqual(8, file.FrameCount);
-        Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a));
+        KeyOrderViolationException exception4 = Assert.ThrowsException<KeyOrderViolationException>(() => file.AppendFramesTx(tick12a));
+        Assert.AreEqual(fileName, exception4.FileName);
         Assert.AreEqual(8, file.FrameCount);
 
         // Reset
@@ -823,7 +855,8 @@ internal class FrameValidators
         Assert.AreEqual(tick12a, file.FirstFrame);
         Assert.AreEqual(tick100, file.LastFrame);
 
-        Assert.ThrowsException<ArgumentException>(() => file.DeleteFramesBetween(15, 14));
+        ArgumentException exception1 = Assert.ThrowsException<ArgumentException>(() => file.DeleteFramesBetween(15, 14));
+        Assert.AreEqual("lastKey", exception1.ParamName);
         Assert.AreEqual(5, file.DeleteFramesBetween(13, 15));
         Assert.AreEqual(4, file.FrameCount);
         Assert.AreEqual(tick12a, file.FirstFrame);
@@ -854,7 +887,8 @@ internal class FrameValidators
         Assert.AreEqual(tick12a, file.FirstFrame);
         Assert.AreEqual(tick100, file.LastFrame);
 
-        Assert.ThrowsException<ArgumentException>(() => file.DeleteFrames(9, -100, 12));
+        ArgumentException exception2 = Assert.ThrowsException<ArgumentException>(() => file.DeleteFrames(9, -100, 12));
+        Assert.AreEqual("keys", exception2.ParamName);
         Assert.AreEqual(0, file.DeleteFrames(0, 11, 16, 18, 101, 200));
         Assert.AreEqual(9, file.FrameCount);
         Assert.AreEqual(tick12a, file.FirstFrame);

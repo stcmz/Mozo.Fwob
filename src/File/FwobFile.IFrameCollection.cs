@@ -192,7 +192,7 @@ public partial class FwobFile<TFrame, TKey>
     public override long DeleteFramesBetween(TKey firstKey, TKey lastKey)
     {
         if (firstKey.CompareTo(lastKey) > 0)
-            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}");
+            throw new ArgumentException($"{nameof(lastKey)} must be greater than or equal to {nameof(firstKey)}", nameof(lastKey));
 
         ValidateAccess(FileAccess.ReadWrite);
 
