@@ -67,7 +67,7 @@ public sealed class FwobHeader
 
     public long LastFramePosition => FirstFramePosition + FrameLength * FrameCount;
 
-    public long FileLength => StringTablePosition + StringTablePreservedLength + FrameLength * FrameCount;
+    public long FileLength => FirstFramePosition + FrameLength * FrameCount;
 
     public FwobHeader()
     {

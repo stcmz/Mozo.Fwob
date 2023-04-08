@@ -76,9 +76,6 @@ public static class FwobHeaderReader
         // pos 170: 8 bytes
         header.FrameCount = br.ReadInt64();
 
-        if (header.FrameCount < 0)
-            return null;
-
         // pos 178: 4 bytes, should be the sum of FieldLengths
         header.FrameLength = br.ReadInt32();
 

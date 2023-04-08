@@ -166,6 +166,93 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
     }
 
     /// <summary>
+    /// Fix corrupted file length if everything but the file length is good.
+    /// </summary>
+    /// <remarks>
+    /// To allow this method to fix the file length, all of the following conditions must be met:
+    ///   1) the header format is good, and
+    ///   2) the actual file size minus header length and string table length is divisible by the frame length.
+    /// Otherwise, this method will fail to fix the file.
+    /// 
+    /// This method fix the corruption with two rules:
+    ///   1) if the key ordering of all frames is good,
+    ///      then update the header frame count to reflect the actual file size.
+    ///   2) if the key ordering of the header-frame-count prefixing frames is good,
+    ///      and the number of redundant trailing frames is less than or equal to <paramref name="maxTruncatedFrames"/>.
+    ///      then truncate the file to reflect the header frame count.
+    /// </remarks>
+    /// <param name="path">A file system path to the file being fixed.</param>
+    /// <param name="maxTruncatedFrames">A long integer that represents the maximum number of frames that can be deleted from the tail to match the header frame count.</param>
+    /// <exception cref="CorruptedFileHeaderException"></exception>
+    /// <exception cref="FrameTypeMismatchException"></exception>
+    /// <exception cref="CorruptedFileLengthException"></exception>
+    /// <exception cref="KeyOrderViolationException"></exception>
+    public static void FixFileLength(string path, long maxTruncatedFrames = 2048)
+    {
+        using FileStream stream = new(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using BinaryReader br = new(stream, Encoding.UTF8);
+
+        // Read and validate file header
+        FwobHeader header = br.ReadHeader() ?? throw new CorruptedFileHeaderException(path);
+
+        if (!header.Validate(_FrameInfo))
+            throw new FrameTypeMismatchException(path, typeof(TFrame));
+
+        // Check if the actual length is divisible by frame length
+        long actualLength = br.BaseStream.Length;
+        long actualFramesLength = actualLength - header.FirstFramePosition;
+        if (actualFramesLength % header.FrameLength != 0)
+            throw new CorruptedFileLengthException(path, header.FileLength, actualLength);
+
+        // Nothing to fix
+        long actualFrameCount = actualFramesLength / header.FrameLength;
+        if (actualFrameCount == header.FrameCount)
+            return;
+
+        // Traverse the frames to check the key ordering
+        bool first = true;
+        TKey lastKey = default;
+
+        for (long i = 0; i < actualFrameCount; i++)
+        {
+            TKey key = ReadKey(br, header.FirstFramePosition + i * header.FrameLength);
+
+            if (first)
+            {
+                first = false;
+            }
+            else if (lastKey.CompareTo(key) > 0) // Incorrect ordering
+            {
+                // Truncate the file if prefixing frames are correctly ordered and the trailing frame count falls within allowance
+                long headerFrameCount = Math.Max(0, header.FrameCount);
+
+                if (i >= headerFrameCount && actualFrameCount - i <= maxTruncatedFrames)
+                {
+                    stream.SetLength(header.FirstFramePosition + headerFrameCount * header.FrameLength);
+
+                    if (headerFrameCount != header.FrameCount)
+                    {
+                        actualFrameCount = headerFrameCount;
+                        break;
+                    }
+
+                    return;
+                }
+
+                throw new KeyOrderViolationException(path);
+            }
+
+            lastKey = key;
+        }
+
+        // Update header frame count as the file data passed the validation
+        using BinaryWriter bw = new(stream, Encoding.UTF8);
+        header.FrameCount = actualFrameCount;
+        bw.UpdateFrameCount(header);
+        bw.Flush();
+    }
+
+    /// <summary>
     /// Close the file and release the resources. This method is idempotent.
     /// </summary>
     public void Close()

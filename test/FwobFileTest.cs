@@ -1610,6 +1610,181 @@ public class FwobFileTest
         file.Dispose();
         File.Delete(tmpPath1);
     }
+
+    public class TickTypes
+    {
+        // Identical
+        public class Tick
+        {
+            public int Int0;
+            [Length(4)]
+            public string? Str;
+            public long Int1;
+        }
+    }
+
+    [TestMethod]
+    public void TestFileLengthFixing()
+    {
+        string temp = Path.GetTempFileName();
+
+        // Corrupted file header
+        byte[] bytes = Enumerable.Range(0, 255).Select(o => (byte)o).ToArray();
+        File.WriteAllBytes(temp, bytes);
+        CorruptedFileHeaderException exception1 = Assert.ThrowsException<CorruptedFileHeaderException>(() => FwobFile<Tick, int>.FixFileLength(temp));
+        Assert.AreEqual(temp, exception1.FileName);
+        File.Delete(temp);
+
+        // Frame type mismatch
+        using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+            file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+        File.AppendAllText(temp, "A");
+        FrameTypeMismatchException exception2 = Assert.ThrowsException<FrameTypeMismatchException>(() => FwobFile<TickTypes.Tick, int>.FixFileLength(temp));
+        Assert.AreEqual(temp, exception2.FileName);
+        Assert.AreEqual(typeof(TickTypes.Tick), exception2.FrameType);
+        File.Delete(temp);
+
+        // Nothing to fix
+        using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+            file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+        FwobFile<Tick, int>.FixFileLength(temp);
+        using (FwobFile<Tick, int> file = new(temp))
+        {
+            Assert.AreEqual(5, file.FrameCount);
+            Assert.AreEqual(2048 + 16 * 5, file.Header.FileLength);
+        }
+        File.Delete(temp);
+
+        // Corrupted file length - unable to fix
+        using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+            file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+        File.AppendAllText(temp, "A");
+
+        CorruptedFileLengthException exception3 = Assert.ThrowsException<CorruptedFileLengthException>(() => FwobFile<Tick, int>.FixFileLength(temp));
+        Assert.AreEqual(temp, exception3.FileName);
+        Assert.AreEqual(2048 + 16 * 5 + 1, exception3.ActualLength);
+        Assert.AreEqual(2048 + 16 * 5, exception3.FileLength);
+        File.Delete(temp);
+
+        // Corrupted file length - update frame count
+        foreach (long wrongFrameCount in new[] { 0L, 4L, 6L, -1L, 9999L, long.MinValue, long.MaxValue })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+            using (FileStream file = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file.Seek(170, SeekOrigin.Begin);
+                file.Write(BitConverter.GetBytes(wrongFrameCount));
+            }
+            FwobFile<Tick, int>.FixFileLength(temp);
+            Assert.AreEqual(2048 + 16 * 5, new FileInfo(temp).Length);
+            using (FwobFile<Tick, int> file = new(temp))
+            {
+                Assert.AreEqual(5, file.FrameCount);
+                Assert.AreEqual(2048 + 16 * 5, file.Header.FileLength);
+            }
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - update frame count
+        foreach (long wrongFrameCount in new[] { 1L, 4L, 6L, -1L, 9999L, long.MinValue, long.MaxValue })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick")) { }
+            using (FileStream file = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file.Seek(170, SeekOrigin.Begin);
+                file.Write(BitConverter.GetBytes(wrongFrameCount));
+            }
+            FwobFile<Tick, int>.FixFileLength(temp);
+            Assert.AreEqual(2048, new FileInfo(temp).Length);
+            using (FwobFile<Tick, int> file = new(temp))
+            {
+                Assert.AreEqual(0, file.FrameCount);
+                Assert.AreEqual(2048, file.Header.FileLength);
+            }
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - truncate file
+        foreach (int wrongFrameCount in new[] { 1, 2, 2048 })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0000', wrongFrameCount * 16).ToArray()));
+            FwobFile<Tick, int>.FixFileLength(temp);
+            Assert.AreEqual(2048 + 16 * 5, new FileInfo(temp).Length);
+            using (FwobFile<Tick, int> file = new(temp))
+            {
+                Assert.AreEqual(5, file.FrameCount);
+                Assert.AreEqual(2048 + 16 * 5, file.Header.FileLength);
+            }
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - truncate file
+        foreach (int wrongFrameCount in new[] { 2, 2048 })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick")) { }
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0001', (wrongFrameCount - 1) * 16).ToArray()));
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0000', 16).ToArray()));
+            FwobFile<Tick, int>.FixFileLength(temp);
+            Assert.AreEqual(2048, new FileInfo(temp).Length);
+            using (FwobFile<Tick, int> file = new(temp))
+            {
+                Assert.AreEqual(0, file.FrameCount);
+                Assert.AreEqual(2048, file.Header.FileLength);
+            }
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - unable to fix
+        foreach (int wrongFrameCount in new[] { 1, 2, 2048 })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0000', wrongFrameCount * 16).ToArray()));
+            using (FileStream file = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file.Seek(170, SeekOrigin.Begin);
+                file.Write(BitConverter.GetBytes(8));
+            }
+            KeyOrderViolationException exception4 = Assert.ThrowsException<KeyOrderViolationException>(() => FwobFile<Tick, int>.FixFileLength(temp));
+            Assert.AreEqual(temp, exception4.FileName);
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - beyond allowance
+        foreach (int wrongFrameCount in new[] { 2049, 9999 })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0000', wrongFrameCount * 16).ToArray()));
+            KeyOrderViolationException exception5 = Assert.ThrowsException<KeyOrderViolationException>(() => FwobFile<Tick, int>.FixFileLength(temp));
+            Assert.AreEqual(temp, exception5.FileName);
+            File.Delete(temp);
+        }
+
+        // Corrupted file length - truncate file and update header frame count
+        foreach (int wrongFrameCount in new[] { 1, 2, 2048 })
+        {
+            using (FwobFile<Tick, int> file = new(temp, "TestTick"))
+                file.AppendFrames(tick12a, tick12b, tick12c, tick13, tick100);
+            File.AppendAllText(temp, new(Enumerable.Repeat('\u0000', wrongFrameCount * 16).ToArray()));
+            using (FileStream file = File.Open(temp, FileMode.Open, FileAccess.ReadWrite))
+            {
+                file.Seek(170, SeekOrigin.Begin);
+                file.Write(BitConverter.GetBytes(-100L));
+            }
+            FwobFile<Tick, int>.FixFileLength(temp);
+            Assert.AreEqual(2048, new FileInfo(temp).Length);
+            using (FwobFile<Tick, int> file = new(temp))
+            {
+                Assert.AreEqual(0, file.FrameCount);
+                Assert.AreEqual(2048, file.Header.FileLength);
+            }
+            File.Delete(temp);
+        }
+    }
 }
 
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
