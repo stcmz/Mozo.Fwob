@@ -1020,7 +1020,7 @@ public class FwobFileTest
         Assert.AreEqual(baseLength + 100 * 16, new FileInfo(path0).Length);
         Assert.AreEqual(baseLength + 9900 * 16, new FileInfo(path1).Length);
 
-        using (var ff = new FwobFile<Tick, int>(path0))
+        using (FwobFile<Tick, int> ff = new(path0))
         {
             Assert.AreEqual(100, ff.FrameCount);
             Assert.AreEqual(ff.FirstFrame, new Tick { Time = 0, Value = 0, Str = "0" });
@@ -1031,7 +1031,7 @@ public class FwobFileTest
             for (int i = 0; i < 485; i++)
                 Assert.AreEqual(i.ToString(), ff.Strings[i]);
         }
-        using (var ff = new FwobFile<Tick, int>(path1))
+        using (FwobFile<Tick, int> ff = new(path1))
         {
             Assert.AreEqual(9900, ff.FrameCount);
             Assert.AreEqual(ff.FirstFrame, new Tick { Time = 100, Value = 100 * 3.14, Str = "100" });
@@ -1061,7 +1061,7 @@ public class FwobFileTest
         Assert.AreEqual(baseLength + 1 * 16, new FileInfo(path2).Length);
         tmpPath1 += ".fwob";
 
-        using (var ff = new FwobFile<Tick, int>(path0))
+        using (FwobFile<Tick, int> ff = new(path0))
         {
             ff.LoadStringTable();
             Assert.IsNotNull(ff.Strings);
@@ -1072,7 +1072,7 @@ public class FwobFileTest
             Assert.AreEqual(ff.FirstFrame, new Tick { Time = 0, Value = 0, Str = "0" });
             Assert.AreEqual(ff.LastFrame, new Tick { Time = 0, Value = 0, Str = "0" });
         }
-        using (var ff = new FwobFile<Tick, int>(path1))
+        using (FwobFile<Tick, int> ff = new(path1))
         {
             ff.LoadStringTable();
             Assert.IsNotNull(ff.Strings);
@@ -1083,7 +1083,7 @@ public class FwobFileTest
             Assert.AreEqual(ff.FirstFrame, new Tick { Time = 1, Value = 3.14, Str = "1" });
             Assert.AreEqual(ff.LastFrame, new Tick { Time = 9998, Value = 9998 * 3.14, Str = "9998" });
         }
-        using (var ff = new FwobFile<Tick, int>(path2))
+        using (FwobFile<Tick, int> ff = new(path2))
         {
             ff.LoadStringTable();
             Assert.IsNotNull(ff.Strings);
@@ -1122,9 +1122,9 @@ public class FwobFileTest
         Assert.ThrowsException<FileNotFoundException>(() => FwobFile<Tick, int>.Concat(tmpPath1, path0, path1, path2));
 
         // test file title consistence
-        var file0 = new FwobFile<Tick, int>(path0, "test0"); file0.Dispose();
-        var file1 = new FwobFile<Tick, int>(path1, "test"); file1.Dispose();
-        var file2 = new FwobFile<Tick, int>(path2, "test"); file2.Dispose();
+        FwobFile<Tick, int> file0 = new(path0, "test0"); file0.Dispose();
+        FwobFile<Tick, int> file1 = new(path1, "test"); file1.Dispose();
+        FwobFile<Tick, int> file2 = new(path2, "test"); file2.Dispose();
 
         Assert.ThrowsException<TitleIncompatibleException>(() => FwobFile<Tick, int>.Concat(tmpPath1, path0, path1, path2));
 
@@ -1247,6 +1247,165 @@ public class FwobFileTest
         File.Delete(tmpPath1);
     }
     #endregion
+
+    [TestMethod]
+    public void TestFileUnclosed()
+    {
+        string tmpPath1 = Path.GetTempFileName();
+        string tmpPath2 = Path.GetTempFileName();
+
+        FwobFile<Tick, int> file1 = new(tmpPath1, "HelloFwob", FileMode.Create);
+
+        // AppendFrames(params Tick[])
+        file1.AppendFrames(tick12a);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        FwobFile<Tick, int> file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteFrames(params int[])
+        file1.DeleteFrames(12);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppendFrames(IEnumerable<Tick>)
+        file1.AppendFrames((IEnumerable<Tick>)new[] { tick12a });
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteFrames(IEnumerable<int>)
+        file1.DeleteFrames((IEnumerable<int>)new[] { 12 });
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppString(string)
+        file1.AppendString("mystr");
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        file2.LoadStringTable();
+        Assert.AreEqual(1, file2.StringCount);
+        Assert.AreEqual("mystr", file2.GetString(0));
+        Assert.IsTrue(file2.ContainsString("mystr"));
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteAllStrings()
+        file1.DeleteAllStrings();
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        file2.LoadStringTable();
+        Assert.AreEqual(0, file2.StringCount);
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => file2.GetString(0));
+        Assert.IsFalse(file2.ContainsString("mystr"));
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppendFramesTx(params Tick[])
+        file1.AppendFramesTx(tick12a);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteFramesAfter(int)
+        file1.DeleteFramesAfter(12);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppendFramesTx(IEnumerable<Tick>)
+        file1.AppendFramesTx((IEnumerable<Tick>)new[] { tick12a });
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteFramesBefore(int)
+        file1.DeleteFramesBefore(12);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppendFramesTx(params Tick[])
+        file1.AppendFramesTx(tick12a);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteFramesBetween(int, int)
+        file1.DeleteFramesBetween(12, 12);
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // AppendFramesTx(IEnumerable<Tick>)
+        file1.AppendFramesTx((IEnumerable<Tick>)new[] { tick12a });
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateOneFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // DeleteAllFrames()
+        file1.DeleteAllFrames();
+        File.Copy(tmpPath1, tmpPath2, true);
+
+        file2 = new(tmpPath2);
+        ValidateNoFrame(file2);
+
+        file2.Close();
+        File.Delete(tmpPath2);
+
+        // Clean up
+        file1.Close();
+        File.Delete(tmpPath1);
+    }
 
     [TestMethod]
     public void TestFileClosed()

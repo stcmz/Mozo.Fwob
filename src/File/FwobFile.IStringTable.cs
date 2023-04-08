@@ -134,6 +134,7 @@ public partial class FwobFile<TFrame, TKey>
         Header.StringCount = strings.Count;
         Header.StringTableLength = (int)(_bw.BaseStream.Position - Header.StringTablePosition);
         _bw.UpdateStringTableLength(Header);
+        _bw.Flush();
 
         if (_isStringTableLoaded)
         {
@@ -175,6 +176,7 @@ public partial class FwobFile<TFrame, TKey>
         int index = Header.StringCount++;
         Header.StringTableLength = (int)(_bw.BaseStream.Position - Header.StringTablePosition);
         _bw.UpdateStringTableLength(Header);
+        _bw.Flush();
 
         if (_isStringTableLoaded)
         {
@@ -213,6 +215,7 @@ public partial class FwobFile<TFrame, TKey>
         Header.StringCount = 0;
         Header.StringTableLength = 0;
         _bw!.UpdateStringTableLength(Header);
+        _bw.Flush();
 
         if (_isStringTableLoaded)
         {

@@ -36,6 +36,7 @@ public partial class FwobFile<TFrame, TKey>
         _bw!.BaseStream.SetLength(Header.FirstFramePosition + frameCount * Header.FrameLength);
         Header.FrameCount = frameCount;
         _bw.UpdateFrameCount(Header);
+        _bw.Flush();
     }
 
     #region Append Frames
@@ -62,6 +63,7 @@ public partial class FwobFile<TFrame, TKey>
                 _lastFrame = last;
                 Header.FrameCount += count;
                 _bw.UpdateFrameCount(Header);
+                _bw.Flush();
 
                 throw new KeyOrderViolationException(FilePath!);
             }
@@ -76,6 +78,7 @@ public partial class FwobFile<TFrame, TKey>
         _lastFrame = last;
         Header.FrameCount += count;
         _bw.UpdateFrameCount(Header);
+        _bw.Flush();
 
         return count;
     }
@@ -112,6 +115,7 @@ public partial class FwobFile<TFrame, TKey>
 
         Header.FrameCount += list.Count;
         _bw.UpdateFrameCount(Header);
+        _bw.Flush();
 
         return list.Count;
     }
