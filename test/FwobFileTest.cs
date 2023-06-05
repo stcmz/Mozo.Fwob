@@ -156,6 +156,44 @@ public class FwobFileTest
         file.Dispose();
         File.Delete(tmpfile2);
     }
+
+    [TestMethod]
+    public void TestHeader()
+    {
+        string tmpPath1 = Path.GetTempFileName();
+        FwobFile<Tick, int> file = new(tmpPath1, "HelloFwob", FileMode.Create);
+
+        // Creating a new file
+        Assert.AreEqual(1, file.Header.Version);
+        Assert.AreEqual(0, file.Header.FrameCount);
+        Assert.AreEqual(3, file.Header.FieldCount);
+        Assert.AreEqual(16, file.Header.FrameLength);
+        Assert.AreEqual("HelloFwob", file.Header.Title);
+        Assert.AreEqual(3, file.Header.FieldLengths.Length);
+        Assert.AreEqual(3, file.Header.FieldNames.Length);
+        Assert.AreEqual(file.Header.FieldTypes, file.Header.FieldTypes & 0xFFF);
+        Assert.AreEqual(new FileInfo(tmpPath1).Length, file.Header.FileLength);
+        Assert.AreEqual("Tick", file.Header.FrameType);
+        Assert.AreEqual(0, file.Header.StringCount);
+        Assert.AreEqual(0, file.Header.StringTableLength);
+        file.Dispose();
+
+        // Opening an existing file
+        file = new(tmpPath1);
+        Assert.AreEqual(1, file.Header.Version);
+        Assert.AreEqual(0, file.Header.FrameCount);
+        Assert.AreEqual(3, file.Header.FieldCount);
+        Assert.AreEqual(16, file.Header.FrameLength);
+        Assert.AreEqual("HelloFwob", file.Header.Title);
+        Assert.AreEqual(3, file.Header.FieldLengths.Length);
+        Assert.AreEqual(3, file.Header.FieldNames.Length);
+        Assert.AreEqual(file.Header.FieldTypes, file.Header.FieldTypes & 0xFFF);
+        Assert.AreEqual(new FileInfo(tmpPath1).Length, file.Header.FileLength);
+        Assert.AreEqual("Tick", file.Header.FrameType);
+        Assert.AreEqual(0, file.Header.StringCount);
+        Assert.AreEqual(0, file.Header.StringTableLength);
+        file.Dispose();
+    }
     #endregion
 
     #region StringTable testing

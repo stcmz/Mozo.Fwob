@@ -37,7 +37,7 @@ public static class FwobHeaderReader
             return null;
 
         // pos 6: 16 bytes (allow up to 16 fields)
-        header.FieldLengths = br.ReadBytes(Limits.MaxFields);
+        header.FieldLengths = br.ReadBytes(Limits.MaxFields).Take(header.FieldCount).ToArray();
 
         // pos 22: 8 bytes (up to 16 types, each has 4 bits, up to 16 types defined on FieldType)
         header.FieldTypes = br.ReadUInt64();
@@ -50,6 +50,7 @@ public static class FwobHeaderReader
             if (i < header.FieldCount && header.FieldNames[i].Length == 0)
                 return null;
         }
+        header.FieldNames = header.FieldNames.Take(header.FieldCount).ToArray();
 
         //*********************** Size of String Tables (12 bytes) ************************//
 
