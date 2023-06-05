@@ -13,11 +13,23 @@ namespace Mozo.Fwob;
 // Dynamically generate functions using expression trees for reading/writing a frame/key from/to an on-disk FWOB file.
 public partial class FwobFile<TFrame, TKey>
 {
-    protected static readonly Action<BinaryWriter, TFrame> WriteFrame = GenerateFrameWriter();
+    /// <summary>
+    /// Writes a frame using the passed-in <see cref="BinaryWriter"/>.
+    /// WriteFrame method does not set the position of the underlying stream before writing a frame.
+    /// </summary>
+    public static readonly Action<BinaryWriter, TFrame> WriteFrame = GenerateFrameWriter();
 
-    protected static readonly Func<BinaryReader, TFrame> ReadFrame = GenerateFrameReader();
+    /// <summary>
+    /// Reads a frame and returns it using the passed-in <see cref="BinaryReader"/>.
+    /// ReadFrame method does not set the position of the underlying stream before reading a frame.
+    /// </summary>
+    public static readonly Func<BinaryReader, TFrame> ReadFrame = GenerateFrameReader();
 
-    protected static readonly Func<BinaryReader, long, TKey> ReadKey = GenerateKeyReader();
+    /// <summary>
+    /// Reads the key of the frame at the passed-in position using the passed-in <see cref="BinaryReader"/>.
+    /// ReadKey method sets the position of the underlying stream before reading a key.
+    /// </summary>
+    public static readonly Func<BinaryReader, long, TKey> ReadKey = GenerateKeyReader();
 
     /// <summary>
     /// Dynamically generate a function that reads the key of the frame at the given stream position.
