@@ -69,7 +69,7 @@ public partial class FwobFile<TFrame, TKey> : AbstractFwobFile<TFrame, TKey>, ID
             throw new FileNotReadableException();
 
         FilePath = path;
-        Stream = new FileStream(path, FileMode.Open, access, share);
+        Stream = new FileStream(path, FileMode.Open, access, share, 64 * 1024);
 
         _br = new(Stream, Encoding.UTF8);
 
